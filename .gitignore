@@ -27,3 +27,5 @@ data/postgres_data/
 .idea/
 *.swp
 .DS_Store
+
+data/uploads/
