@@ -1,0 +1,172 @@
+{
+  "id": "venue-ttk-expo-2026",
+  "slug": "ttk-expo",
+  "title": "Инновационный Экспоцентр ТТК",
+  "description": "Ежегодный технологический форум ТрансТелеКом. Навигация по стендам, спикер-холлам и зонам отдыха.",
+  "coverUrl": "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=1200&q=80",
+  "publishedRevision": 1,
+  "createdAt": "2026-10-23T18:00:00Z",
+  "floors": [
+    {
+      "id": "floor-1",
+      "venueId": "venue-ttk-expo-2026",
+      "level": 1,
+      "name": "1 этаж — Главный павильон",
+      "planUrl": "/assets/floor1_plan.svg",
+      "width": 1200,
+      "height": 800,
+      "metersPerPixel": 0.05,
+      "points": [
+        {
+          "id": "poi-entrance",
+          "floorId": "floor-1",
+          "name": "Главный вход & Регистрация",
+          "category": "service",
+          "description": "Выдача бейджей, гардероб и справочная служба",
+          "x": 600,
+          "y": 740,
+          "isPublic": true
+        },
+        {
+          "id": "poi-ttk-stand",
+          "floorId": "floor-1",
+          "name": "Центральный стенд ТТК",
+          "category": "sponsor",
+          "description": "Презентация indoor-навигации, квантовых сетей и магистральных каналов связи",
+          "x": 600,
+          "y": 400,
+          "isPublic": true
+        },
+        {
+          "id": "poi-main-hall",
+          "floorId": "floor-1",
+          "name": "Конференц-зал «Сириус»",
+          "category": "hall",
+          "description": "Главная сцена, пленарные доклады и панельные дискуссии (вместимость 500 чел)",
+          "x": 250,
+          "y": 300,
+          "isPublic": true
+        },
+        {
+          "id": "poi-food",
+          "floorId": "floor-1",
+          "name": "Кофе-брейк и лаундж-зона",
+          "category": "food",
+          "description": "Горячие напитки, закуски и мягкие пуфы для нетворкинга",
+          "x": 950,
+          "y": 300,
+          "isPublic": true
+        },
+        {
+          "id": "poi-wc-1",
+          "floorId": "floor-1",
+          "name": "Санузлы (1 этаж)",
+          "category": "wc",
+          "description": "Мужской, женский и санузел для МГН",
+          "x": 1050,
+          "y": 700,
+          "isPublic": true
+        },
+        {
+          "id": "poi-stairs-1",
+          "floorId": "floor-1",
+          "name": "Лестница на 2 этаж",
+          "category": "service",
+          "description": "Переход к переговорным комнатам и VIP-лаунджу",
+          "x": 300,
+          "y": 650,
+          "isPublic": true
+        }
+      ],
+      "panoramas": [
+        {
+          "id": "pano-entrance",
+          "floorId": "floor-1",
+          "x": 600,
+          "y": 700,
+          "url": "https://pannellum.org/images/alma.jpg",
+          "previewUrl": "https://pannellum.org/images/alma.jpg",
+          "yawOffset": 0,
+          "hotspots": [
+            {
+              "id": "h-to-ttk",
+              "panoramaId": "pano-entrance",
+              "yaw": 0,
+              "pitch": -5,
+              "type": "scene",
+              "text": "Пройти к стенду ТТК",
+              "targetPanoramaId": "pano-ttk"
+            },
+            {
+              "id": "h-info-reg",
+              "panoramaId": "pano-entrance",
+              "yaw": -35,
+              "pitch": 0,
+              "type": "info",
+              "text": "Стойка регистрации"
+            }
+          ]
+        },
+        {
+          "id": "pano-ttk",
+          "floorId": "floor-1",
+          "x": 600,
+          "y": 420,
+          "url": "https://pannellum.org/images/jfk.jpg",
+          "previewUrl": "https://pannellum.org/images/jfk.jpg",
+          "yawOffset": 0,
+          "hotspots": [
+            {
+              "id": "h-to-hall",
+              "panoramaId": "pano-ttk",
+              "yaw": -90,
+              "pitch": -3,
+              "type": "scene",
+              "text": "В зал «Сириус»",
+              "targetPanoramaId": "pano-hall"
+            },
+            {
+              "id": "h-to-food",
+              "panoramaId": "pano-ttk",
+              "yaw": 90,
+              "pitch": -3,
+              "type": "scene",
+              "text": "К кофе-поинту",
+              "targetPanoramaId": "pano-food"
+            },
+            {
+              "id": "h-back-entrance",
+              "panoramaId": "pano-ttk",
+              "yaw": 180,
+              "pitch": -5,
+              "type": "scene",
+              "text": "Назад к выходу",
+              "targetPanoramaId": "pano-entrance"
+            }
+          ]
+        }
+      ],
+      "graph": {
+        "nodes": [
+          { "id": "n-entrance", "floorId": "floor-1", "x": 600, "y": 740, "kind": "door" },
+          { "id": "n-cross-main", "floorId": "floor-1", "x": 600, "y": 600, "kind": "corridor" },
+          { "id": "n-ttk-stand", "floorId": "floor-1", "x": 600, "y": 400, "kind": "corridor" },
+          { "id": "n-cross-north", "floorId": "floor-1", "x": 600, "y": 300, "kind": "corridor" },
+          { "id": "n-hall-door", "floorId": "floor-1", "x": 250, "y": 300, "kind": "door" },
+          { "id": "n-food-door", "floorId": "floor-1", "x": 950, "y": 300, "kind": "door" },
+          { "id": "n-stairs-1", "floorId": "floor-1", "x": 300, "y": 650, "kind": "stairs" },
+          { "id": "n-wc-1", "floorId": "floor-1", "x": 1050, "y": 700, "kind": "door" }
+        ],
+        "edges": [
+          { "id": "e1", "fromId": "n-entrance", "toId": "n-cross-main", "lengthMeters": 7, "kind": "walk", "bidirectional": true },
+          { "id": "e2", "fromId": "n-cross-main", "toId": "n-ttk-stand", "lengthMeters": 10, "kind": "walk", "bidirectional": true },
+          { "id": "e3", "fromId": "n-ttk-stand", "toId": "n-cross-north", "lengthMeters": 5, "kind": "walk", "bidirectional": true },
+          { "id": "e4", "fromId": "n-cross-north", "toId": "n-hall-door", "lengthMeters": 17, "kind": "walk", "bidirectional": true },
+          { "id": "e5", "fromId": "n-cross-north", "toId": "n-food-door", "lengthMeters": 17, "kind": "walk", "bidirectional": true },
+          { "id": "e6", "fromId": "n-cross-main", "toId": "n-stairs-1", "lengthMeters": 15, "kind": "walk", "bidirectional": true },
+          { "id": "e7", "fromId": "n-cross-main", "toId": "n-wc-1", "lengthMeters": 22, "kind": "walk", "bidirectional": true }
+        ]
+      }
+    }
+  ]
+}

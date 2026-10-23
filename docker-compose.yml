@@ -1,0 +1,65 @@
+# Docker Compose для всех сервисов хакатона ТТК
+
+services:
+  # Бэкенд API и A* алгоритм навигации (Участник №3)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ttk-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./shared:/app/shared
+      - ./data/uploads:/app/uploads
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+
+  # Мобильный веб-клиент посетителя (Участник №1)
+  frontend-client:
+    build:
+      context: ./frontend-client
+      dockerfile: Dockerfile
+    container_name: ttk-client
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend-client:/app
+      - /app/node_modules
+      - ./shared:/app/shared
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Студия редактора для организатора (Участник №2)
+  frontend-admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile
+    container_name: ttk-admin
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./frontend-admin:/app
+      - /app/node_modules
+      - ./shared:/app/shared
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Воркер сшивки панорам и сжатия WebP (Участник №4)
+  cv-worker:
+    build:
+      context: ./cv-worker
+      dockerfile: Dockerfile
+    container_name: ttk-cv-worker
+    volumes:
+      - ./cv-worker:/app
+      - ./data/uploads:/app/uploads
+    restart: unless-stopped
