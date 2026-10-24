@@ -38,16 +38,23 @@
 2. Подпапка с 2+ изображениями считается набором кадров и сшивается в панораму
    с именем этой подпапки.
 3. Для каждой панорамы пишется `<name>.json` — манифест с `url`,
-   `previewUrl`, размерами (включая `previewWidth`/`previewHeight`) и списком
-   исходных кадров. Он совместим с типом `Panorama` из `shared/types.ts`.
-4. Обработанные файлы запоминаются в `.cv-worker-state.json` по размеру и
+   `previewUrl`, размерами (включая `previewWidth`/`previewHeight`), списком
+   исходных кадров и полями `Panorama`: `floorId`, `x`, `y`, `yawOffset`,
+   `hotspots`. Если `--public-prefix` не задан, URL будут относительными
+   (`lobby.webp`), иначе — `/uploads/panoramas/lobby.webp`.
+4. Хотспоты можно положить рядом с кадрами в `hotspots.json` (для сшивки) или
+   в `<name>.hotspots.json` (для одиночного изображения); также работает
+   `--hotspots-file`.
+5. После прохода пишется `index.json` — каталог всех манифестов с `count` и
+   `panoramas`, чтобы не сканировать папку снаружи.
+6. Обработанные файлы запоминаются в `.cv-worker-state.json` по размеру и
    mtime, а также по параметрам сжатия. Изменение `--max-width`, качества или
    `--no-crop` автоматически пересобирает результат.
-5. Файлы, изменённые менее `--settle-seconds` назад, пропускаются — это
+7. Файлы, изменённые менее `--settle-seconds` назад, пропускаются — это
    защищает от обработки недописанного upload. Если хотя бы один из
    `*.webp`/`*_preview.webp`/`*.json` пропал, панорама пересобирается.
-6. Запись WebP атомарная: сначала во временный файл, затем `os.replace`,
-   поэтому оборванная обработка не оставляет битых результатов.
+8. Запись WebP и манифестов атомарная: сначала во временный файл, затем
+   `os.replace`, поэтому оборванная обработка не оставляет битых результатов.
 
 Пример структуры загрузок:
 
@@ -57,12 +64,14 @@ data/uploads/
 │   ├── lobby/                # 2+ кадра -> сшивка
 │   │   ├── frame_01.jpg
 │   │   ├── frame_02.jpg
-│   │   └── frame_03.jpg
+│   │   ├── frame_03.jpg
+│   │   └── hotspots.json     # необязательно
 │   └── ready_pano.jpg        # готовое 2:1 фото -> только сжатие
 └── panoramas/                # создаёт воркер
     ├── lobby.webp
     ├── lobby_preview.webp
-    └── lobby.json
+    ├── lobby.json
+    └── index.json
 ```
 
 ## CLI
@@ -82,13 +91,25 @@ python worker.py watch -i data/uploads -o data/uploads/panoramas --interval 5
 
 # Один проход без ожидания «успокоения» файлов (например, в CI)
 python worker.py watch -i data/uploads -o data/uploads/panoramas --once --settle-seconds 0
+
+# Сшивка с явными хотспотами и метаданными для Panorama
+python worker.py stitch shots/*.jpg -n lobby -o uploads/panoramas \
+  --floor-id floor-1 --x 600 --y 400 --hotspots-file shots/hotspots.json
 ```
 
-Полезные флаги: `--preview-width`, `--max-width`, `--quality-full`,
+Полезные флаги сжатия: `--preview-width`, `--max-width`, `--quality-full`,
 `--quality-preview`, `--no-crop`, `--public-prefix`.
 
+Метаданные манифеста: `--floor-id`, `--x`, `--y`, `--yaw-offset`,
+`--hotspots-file`.
+
+Тюнинг OpenCV Stitcher: `--confidence-thresh`, `--registration-resol`,
+`--seam-resol`, `--compositing-resol`, `--no-wave-correction`.
+
 Переменные окружения: `CV_INPUT_DIR`, `CV_OUTPUT_DIR`, `CV_WATCH_INTERVAL`,
-`CV_SETTLE_SECONDS`, `CV_PUBLIC_PREFIX`, `CV_LOG_LEVEL`.
+`CV_SETTLE_SECONDS`, `CV_PUBLIC_PREFIX`, `CV_FLOOR_ID`, `CV_X`, `CV_Y`,
+`CV_YAW_OFFSET`, `CV_CONFIDENCE_THRESH`, `CV_REGISTRATION_RESOL`,
+`CV_SEAM_RESOL`, `CV_COMPOSITING_RESOL`, `CV_LOG_LEVEL`.
 
 ## Тесты
 

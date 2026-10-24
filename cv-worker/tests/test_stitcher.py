@@ -67,3 +67,31 @@ def test_manifest_contains_public_urls(tmp_path):
     assert manifest["url"] == "/uploads/panoramas/lobby.webp"
     assert manifest["previewUrl"] == "/uploads/panoramas/lobby_preview.webp"
     assert public_url("/uploads/panoramas/", "/x/y.webp") == "/uploads/panoramas/y.webp"
+    assert public_url("", "/x/y.webp") == "y.webp"
+
+
+def test_manifest_has_panorama_fields_and_relative_urls(tmp_path):
+    source = make_image(tmp_path / "lobby.png", (2048, 1024))
+    result = compress_panorama(source, tmp_path / "out")
+    hotspots = [{"id": "h1", "yaw": 10, "pitch": 0, "type": "info", "text": "Вход"}]
+
+    manifest = build_manifest(
+        result,
+        "",
+        metadata={
+            "floorId": "floor-1",
+            "x": 600,
+            "y": 400,
+            "yawOffset": 90,
+            "hotspots": hotspots,
+        },
+    )
+
+    assert manifest["type"] == "panorama"
+    assert manifest["url"] == "lobby.webp"
+    assert manifest["previewUrl"] == "lobby_preview.webp"
+    assert manifest["floorId"] == "floor-1"
+    assert manifest["x"] == 600
+    assert manifest["y"] == 400
+    assert manifest["yawOffset"] == 90
+    assert manifest["hotspots"] == hotspots
