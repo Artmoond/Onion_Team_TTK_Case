@@ -204,7 +204,7 @@ export default function AuthScreen({ mode, alternateUrl, onAuthenticated }: Auth
               <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl bg-slate-950/70 p-1.5 ring-1 ring-slate-800">
                 <button
                   type="button"
-                  onClick={isAdmin ? undefined : goToAlternateRole}
+                  onClick={isAdmin ? goToAlternateRole : undefined}
                   className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-xs font-bold transition-all ${
                     !isAdmin
                       ? 'bg-[#E30613] text-white shadow-lg'
