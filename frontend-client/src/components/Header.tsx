@@ -28,17 +28,11 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center bg-[#E30613] text-white font-black text-xs px-2 py-1 rounded shadow-md tracking-wider">
             <span>ТТК</span>
           </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-sm tracking-tight text-white">Карта Пространства</span>
-              <span className="text-[10px] bg-red-950/70 border border-red-500/30 text-red-400 px-1.5 py-0.2 rounded font-semibold flex items-center gap-0.5">
-                <Sparkles className="w-2.5 h-2.5" /> 2026
-              </span>
-            </div>
-            <div className="flex items-center gap-1 text-[10px] text-slate-400">
-              <span className={`inline-block w-1.5 h-1.5 rounded-full ${isBackendConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-              <span>{isBackendConnected ? 'API онлайн' : 'Автономный режим'}</span>
-            </div>
+          <div className="flex items-center gap-1.5">
+            <span className="font-extrabold text-sm tracking-tight text-white">Карта Пространства</span>
+            <span className="text-[10px] bg-red-950/70 border border-red-500/30 text-red-400 px-1.5 py-0.2 rounded font-semibold flex items-center gap-0.5">
+              <Sparkles className="w-2.5 h-2.5" /> 2026
+            </span>
           </div>
         </div>
 

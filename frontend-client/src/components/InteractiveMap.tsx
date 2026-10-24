@@ -35,25 +35,30 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Базовый масштаб по умолчанию: 1.25 (отображается как 100%)
+  const BASE_SCALE = 1.25;
+  const MAX_SCALE = 3.5;
+
   // Состояние трансформации (масштаб и смещение)
-  const [scale, setScale] = useState<number>(1);
+  const [scale, setScale] = useState<number>(BASE_SCALE);
   const [translate, setTranslate] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState<boolean>(false);
+  const [hoveredPoiId, setHoveredPoiId] = useState<string | null>(null);
   const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const translateStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // Мультитач для pinch-to-zoom
   const touchDistRef = useRef<number | null>(null);
 
-  // Сброс масштаба в центр
+  // Сброс масштаба в центр (к базовым 100%)
   const handleResetView = useCallback(() => {
-    setScale(1);
+    setScale(BASE_SCALE);
     setTranslate({ x: 0, y: 0 });
   }, []);
 
-  // Зум кнопками
+  // Зум кнопками (не может быть меньше базового 100%)
   const handleZoom = (delta: number) => {
-    setScale(prev => Math.min(3.5, Math.max(0.65, Number((prev + delta).toFixed(2)))));
+    setScale(prev => Math.min(MAX_SCALE, Math.max(BASE_SCALE, Number((prev + delta).toFixed(2)))));
   };
 
   // Колесо мыши (зум относительно центра)
@@ -115,7 +120,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       const diff = newDist - touchDistRef.current;
       if (Math.abs(diff) > 2) {
         const factor = diff > 0 ? 0.03 : -0.03;
-        setScale(prev => Math.min(3.5, Math.max(0.65, prev + factor)));
+        setScale(prev => Math.min(MAX_SCALE, Math.max(BASE_SCALE, prev + factor)));
         touchDistRef.current = newDist;
       }
     }
@@ -191,12 +196,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         >
           <ZoomIn className="w-4 h-4" />
         </button>
-        <span className="text-[10px] font-bold text-slate-400 py-0.5 select-none">
-          {Math.round(scale * 100)}%
+        <span className="text-[10px] font-bold text-slate-300 py-0.5 select-none">
+          {Math.round((scale / BASE_SCALE) * 100)}%
         </span>
         <button
           onClick={() => handleZoom(-0.25)}
-          className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors active:scale-90"
+          disabled={scale <= BASE_SCALE}
+          className={`p-2 rounded-xl transition-colors active:scale-90 ${
+            scale <= BASE_SCALE
+              ? 'text-slate-600 cursor-not-allowed opacity-40'
+              : 'text-slate-300 hover:text-white hover:bg-slate-800'
+          }`}
           title="Отдалить"
         >
           <ZoomOut className="w-4 h-4" />
@@ -205,16 +215,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <button
           onClick={handleResetView}
           className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors active:scale-90"
-          title="Сбросить вид"
+          title="Сбросить к исходному виду 100%"
         >
           <Maximize2 className="w-4 h-4" />
         </button>
-      </div>
-
-      {/* Подсказка жестов снизу слева */}
-      <div className="absolute top-4 left-3 z-20 pointer-events-none bg-slate-900/70 backdrop-blur-md px-2.5 py-1 rounded-full border border-slate-700/40 text-[10px] text-slate-400 flex items-center gap-1.5 shadow-md">
-        <span className="w-1.5 h-1.5 rounded-full bg-[#E30613]" />
-        <span>{floor.name}</span>
       </div>
 
       {/* SVG Холст карты с плавным transform */}
@@ -533,6 +537,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           {/* ================= POI МАРКЕРЫ ================= */}
           {pois.map(poi => {
             const isSelected = selectedPoi?.id === poi.id;
+            const isHovered = hoveredPoiId === poi.id;
+            const showTooltip = isHovered || isSelected;
             const style = getCategoryStyles(poi.category);
 
             return (
@@ -540,9 +546,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 key={poi.id}
                 transform={`translate(${poi.x}, ${poi.y})`}
                 onClick={() => onSelectPoi(poi)}
+                onPointerEnter={() => setHoveredPoiId(poi.id)}
+                onPointerLeave={() => setHoveredPoiId(null)}
                 className="interactive-pin cursor-pointer transition-transform duration-200"
                 style={{
-                  transform: `translate(${poi.x}px, ${poi.y}px) ${isSelected ? 'scale(1.35)' : 'scale(1)'}`,
+                  transform: `translate(${poi.x}px, ${poi.y}px) ${isSelected || isHovered ? 'scale(1.25)' : 'scale(1)'}`,
                 }}
               >
                 {/* Анимация выбора */}
@@ -569,30 +577,32 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 />
                 <circle cx="0" cy="0" r="5" fill="white" />
 
-                {/* Название точки над пином */}
-                <g transform="translate(0, -24)">
-                  <rect
-                    x={-((poi.name.length * 7) / 2 + 10)}
-                    y="-12"
-                    width={poi.name.length * 7 + 20}
-                    height="20"
-                    rx="6"
-                    fill={isSelected ? '#E30613' : '#0f172a'}
-                    stroke={isSelected ? 'white' : '#334155'}
-                    strokeWidth="1.5"
-                    className="shadow-lg"
-                  />
-                  <text
-                    x="0"
-                    y="2"
-                    textAnchor="middle"
-                    fill="white"
-                    fontSize="10"
-                    fontWeight={isSelected ? 'bold' : '600'}
-                  >
-                    {poi.name}
-                  </text>
-                </g>
+                {/* Всплывающий тултип ТОЛЬКО при наведении или выборе */}
+                {showTooltip && (
+                  <g transform="translate(0, -26)" className="pointer-events-none">
+                    <rect
+                      x={-((poi.name.length * 7.2) / 2 + 10)}
+                      y="-13"
+                      width={poi.name.length * 7.2 + 20}
+                      height="22"
+                      rx="7"
+                      fill={isSelected ? '#E30613' : '#0f172a'}
+                      stroke={isSelected ? 'white' : '#38bdf8'}
+                      strokeWidth="1.5"
+                      className="shadow-2xl"
+                    />
+                    <text
+                      x="0"
+                      y="2"
+                      textAnchor="middle"
+                      fill="white"
+                      fontSize="10"
+                      fontWeight="bold"
+                    >
+                      {poi.name}
+                    </text>
+                  </g>
+                )}
               </g>
             );
           })}
