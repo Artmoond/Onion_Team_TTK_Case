@@ -24,14 +24,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = Path("/app/uploads")
+UPLOAD_DIR = Path(os.getenv("TTK_UPLOAD_DIR", "/app/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Монтируем папку с загрузками для раздачи файлов (планы, панорамы)
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 # Загружаем эталонный датасет (In-Memory Database для быстрого старта на хакатоне)
-MOCK_FILE = Path("/app/shared/mock_venue.json")
+MOCK_FILE = Path(os.getenv("TTK_MOCK_FILE", "/app/shared/mock_venue.json"))
 local_venues_db: Dict[str, Any] = {}
 
 def load_initial_data():

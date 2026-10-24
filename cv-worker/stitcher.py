@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -23,6 +24,10 @@ DEFAULT_PREVIEW_WIDTH = 1024
 DEFAULT_MAX_WIDTH = 4096
 DEFAULT_QUALITY_FULL = 85
 DEFAULT_QUALITY_PREVIEW = 75
+DEFAULT_CONFIDENCE_THRESH = 1.0
+DEFAULT_REGISTRATION_RESOL = 0.6
+DEFAULT_SEAM_RESOL = 0.1
+DEFAULT_COMPOSITING_RESOL = 1.0
 
 _STITCH_ERRORS = {
     getattr(cv2, "Stitcher_ERR_NEED_MORE_IMGS", 1): "нужно больше перекрывающихся кадров",
@@ -64,7 +69,15 @@ def crop_to_aspect(image: Image.Image, aspect: float = PANORAMA_ASPECT) -> Image
 
 def _save_webp(image: Image.Image, path: Path, quality: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(path, "WEBP", quality=quality, method=6)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        image.save(tmp_path, "WEBP", quality=quality, method=6)
+        os.replace(tmp_path, path)
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _compress_image(
@@ -86,10 +99,14 @@ def _compress_image(
         new_height = max(1, round(full.height * (max_width / full.width)))
         full = full.resize((max_width, new_height), Image.Resampling.LANCZOS)
 
-    preview = full.resize(
-        (preview_width, max(1, round(preview_width / (full.width / full.height)))),
-        Image.Resampling.LANCZOS,
-    )
+    target_preview_width = min(preview_width, full.width)
+    if target_preview_width == full.width:
+        preview = full
+    else:
+        preview = full.resize(
+            (target_preview_width, max(1, round(target_preview_width / (full.width / full.height)))),
+            Image.Resampling.LANCZOS,
+        )
 
     full_path = output_dir / f"{stem}.webp"
     preview_path = output_dir / f"{stem}_preview.webp"
@@ -101,6 +118,8 @@ def _compress_image(
         "width": full.width,
         "height": full.height,
         "aspectRatio": round(full.width / full.height, 3),
+        "previewWidth": preview.width,
+        "previewHeight": preview.height,
         "full": str(full_path),
         "preview": str(preview_path),
         "bytes": {
@@ -149,10 +168,37 @@ def _read_frames(image_paths: Sequence[Path]) -> list:
     return frames
 
 
+def _configure_stitcher(
+    stitcher,
+    *,
+    confidence_thresh: float,
+    wave_correction: bool,
+    registration_resol: float,
+    seam_resol: float,
+    compositing_resol: float,
+) -> None:
+    options = (
+        ("setPanoConfidenceThresh", confidence_thresh),
+        ("setWaveCorrection", wave_correction),
+        ("setRegistrationResol", registration_resol),
+        ("setSeamEstimationResol", seam_resol),
+        ("setCompositingResol", compositing_resol),
+    )
+    for method_name, value in options:
+        setter = getattr(stitcher, method_name, None)
+        if setter is not None:
+            setter(value)
+
+
 def stitch_to_image(
     image_paths: Sequence[Path | str],
     *,
     crop: bool = True,
+    confidence_thresh: float = DEFAULT_CONFIDENCE_THRESH,
+    wave_correction: bool = True,
+    registration_resol: float = DEFAULT_REGISTRATION_RESOL,
+    seam_resol: float = DEFAULT_SEAM_RESOL,
+    compositing_resol: float = DEFAULT_COMPOSITING_RESOL,
 ) -> Image.Image:
     """Сшивает кадры OpenCV Stitcher'ом и возвращает RGB-панораму."""
     paths = [Path(p) for p in image_paths]
@@ -161,6 +207,14 @@ def stitch_to_image(
         raise StitchingError("для сшивки нужно минимум 2 читаемых кадра")
 
     stitcher = cv2.Stitcher_create(cv2.Stitcher_PANORAMA)
+    _configure_stitcher(
+        stitcher,
+        confidence_thresh=confidence_thresh,
+        wave_correction=wave_correction,
+        registration_resol=registration_resol,
+        seam_resol=seam_resol,
+        compositing_resol=compositing_resol,
+    )
     status, panorama = stitcher.stitch(frames)
     if status != cv2.Stitcher_OK or panorama is None:
         reason = _STITCH_ERRORS.get(status, f"неизвестный код {status}")
@@ -176,10 +230,11 @@ def stitch_images(
     output_path: Path | str,
     *,
     crop: bool = True,
+    **stitch_kwargs,
 ) -> dict:
     """Сшивает кадры и сохраняет результат в output_path (jpg/png/webp)."""
     output_path = Path(output_path)
-    image = stitch_to_image(image_paths, crop=crop)
+    image = stitch_to_image(image_paths, crop=crop, **stitch_kwargs)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     image.save(output_path)
     return {
@@ -194,11 +249,13 @@ def stitch_and_compress(
     image_paths: Sequence[Path | str],
     output_dir: Path | str,
     name: str,
+    *,
+    stitch_options: dict | None = None,
     **compress_kwargs,
 ) -> dict:
     """Сшивает кадры и сразу сохраняет full/preview WebP с манифестом."""
     output_dir = Path(output_dir)
-    image = stitch_to_image(image_paths)
+    image = stitch_to_image(image_paths, **(stitch_options or {}))
     result = _compress_image(image, name, output_dir, **compress_kwargs)
     result["type"] = "panorama"
     result["sourceFrames"] = [str(p) for p in image_paths]
@@ -207,26 +264,48 @@ def stitch_and_compress(
 
 
 def public_url(prefix: str, path: Path | str) -> str:
-    return f"{prefix.rstrip('/')}/{Path(path).name}"
+    name = Path(path).name
+    if not prefix:
+        return name
+    return f"{prefix.rstrip('/')}/{name}"
 
 
-def build_manifest(result: dict, public_prefix: str = "") -> dict:
+def build_manifest(
+    result: dict,
+    public_prefix: str = "",
+    metadata: dict | None = None,
+) -> dict:
     """Дополняет результат ссылками, совместимыми с shared/types.ts (Panorama)."""
     manifest = dict(result)
     manifest["id"] = Path(result.get("full", "panorama")).stem
-    if public_prefix:
-        manifest["url"] = public_url(public_prefix, result["full"])
-        manifest["previewUrl"] = public_url(public_prefix, result["preview"])
+    manifest["type"] = result.get("type", "panorama")
+    manifest["url"] = public_url(public_prefix, result["full"])
+    manifest["previewUrl"] = public_url(public_prefix, result["preview"])
+
+    extra = dict(metadata or {})
+    manifest["floorId"] = extra.get("floorId", "")
+    manifest["x"] = extra.get("x", 0)
+    manifest["y"] = extra.get("y", 0)
+    manifest["yawOffset"] = extra.get("yawOffset", 0)
+    manifest["hotspots"] = list(extra.get("hotspots", []))
     return manifest
 
 
 def write_manifest(output_dir: Path | str, name: str, manifest: dict) -> Path:
     path = Path(output_dir) / f"{name}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp_path.write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        os.replace(tmp_path, path)
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
     return path
 
 

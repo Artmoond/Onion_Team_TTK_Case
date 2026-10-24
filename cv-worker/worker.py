@@ -16,14 +16,19 @@ import signal
 import sys
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
 from stitcher import (
+    DEFAULT_COMPOSITING_RESOL,
+    DEFAULT_CONFIDENCE_THRESH,
     DEFAULT_MAX_WIDTH,
     DEFAULT_PREVIEW_WIDTH,
     DEFAULT_QUALITY_FULL,
     DEFAULT_QUALITY_PREVIEW,
+    DEFAULT_REGISTRATION_RESOL,
+    DEFAULT_SEAM_RESOL,
     PANORAMA_ASPECT,
     StitchingError,
     build_manifest,
@@ -37,6 +42,8 @@ from stitcher import (
 LOG = logging.getLogger("cv-worker")
 
 STATE_FILE = ".cv-worker-state.json"
+INDEX_FILE = "index.json"
+DEFAULT_SETTLE_SECONDS = 2.0
 
 
 @dataclass
@@ -45,12 +52,29 @@ class Job:
     name: str
     frames: list[Path]
 
-    def fingerprint(self) -> str:
+    def fingerprint(self, options_key: str = "") -> str:
         parts = []
         for path in self.frames:
             stat = path.stat()
             parts.append(f"{path.name}:{stat.st_size}:{int(stat.st_mtime)}")
+        parts.append(f"options:{options_key}")
         return "|".join(parts)
+
+    def is_settled(self, settle_seconds: float) -> bool:
+        if settle_seconds <= 0:
+            return True
+        now = time.time()
+        try:
+            return all(now - path.stat().st_mtime >= settle_seconds for path in self.frames)
+        except OSError:
+            return False
+
+
+def outputs_exist(output_dir: Path, name: str) -> bool:
+    return all(
+        (output_dir / filename).exists()
+        for filename in (f"{name}.webp", f"{name}_preview.webp", f"{name}.json")
+    )
 
 
 def load_state(output_dir: Path) -> dict:
@@ -108,16 +132,107 @@ def compression_options(args: argparse.Namespace) -> dict:
     }
 
 
+def stitching_options(args: argparse.Namespace) -> dict:
+    return {
+        "confidence_thresh": getattr(args, "confidence_thresh", DEFAULT_CONFIDENCE_THRESH),
+        "wave_correction": not getattr(args, "no_wave_correction", False),
+        "registration_resol": getattr(args, "registration_resol", DEFAULT_REGISTRATION_RESOL),
+        "seam_resol": getattr(args, "seam_resol", DEFAULT_SEAM_RESOL),
+        "compositing_resol": getattr(args, "compositing_resol", DEFAULT_COMPOSITING_RESOL),
+    }
+
+
+def load_hotspots(args: argparse.Namespace, job: Job) -> list:
+    explicit = getattr(args, "hotspots_file", None)
+    if explicit is not None:
+        path = Path(explicit)
+        if not path.exists():
+            raise ValueError(f"файл хотспотов не найден: {path}")
+    elif job.kind == "stitch":
+        path = job.frames[0].parent / "hotspots.json"
+        if not path.exists():
+            return []
+    else:
+        path = job.frames[0].parent / f"{job.name}.hotspots.json"
+        if not path.exists():
+            return []
+
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"не удалось прочитать хотспоты {path}: {exc}") from exc
+    if not isinstance(data, list) or not all(isinstance(item, dict) for item in data):
+        raise ValueError(f"{path}: ожидается JSON-массив объектов")
+    return data
+
+
+def manifest_metadata(args: argparse.Namespace, job: Job) -> dict:
+    return {
+        "floorId": getattr(args, "floor_id", ""),
+        "x": getattr(args, "x", 0),
+        "y": getattr(args, "y", 0),
+        "yawOffset": getattr(args, "yaw_offset", 0),
+        "hotspots": load_hotspots(args, job),
+    }
+
+
 def run_job(job: Job, output_dir: Path, args: argparse.Namespace) -> dict:
     options = compression_options(args)
     if job.kind == "stitch":
-        result = stitch_and_compress(job.frames, output_dir, job.name, **options)
+        result = stitch_and_compress(
+            job.frames,
+            output_dir,
+            job.name,
+            stitch_options=stitching_options(args),
+            **options,
+        )
     else:
         result = compress_panorama(job.frames[0], output_dir, **options)
 
-    manifest = build_manifest(result, args.public_prefix)
+    manifest = build_manifest(
+        result,
+        args.public_prefix,
+        metadata=manifest_metadata(args, job),
+    )
     write_manifest(output_dir, job.name, manifest)
     return manifest
+
+
+def build_index(output_dir: Path) -> dict:
+    panoramas = []
+    for path in sorted(output_dir.glob("*.json")):
+        if path.name in (INDEX_FILE, STATE_FILE):
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            LOG.warning("пропуск битого манифеста %s", path)
+            continue
+        if isinstance(data, dict) and data.get("id") and data.get("url"):
+            panoramas.append(data)
+
+    return {
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "count": len(panoramas),
+        "panoramas": panoramas,
+    }
+
+
+def write_index(output_dir: Path) -> Path:
+    path = output_dir / INDEX_FILE
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        tmp_path.write_text(
+            json.dumps(build_index(output_dir), ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        os.replace(tmp_path, path)
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+    return path
 
 
 def process_once(input_dir: Path, output_dir: Path, args: argparse.Namespace) -> int:
@@ -125,10 +240,17 @@ def process_once(input_dir: Path, output_dir: Path, args: argparse.Namespace) ->
     state = load_state(output_dir)
     processed = 0
 
+    options_key = json.dumps(compression_options(args), sort_keys=True, default=str)
+    settle_seconds = getattr(args, "settle_seconds", 0.0)
+
     for job in discover_jobs(input_dir, output_dir):
-        fingerprint = job.fingerprint()
+        fingerprint = job.fingerprint(options_key)
         key = f"{job.kind}:{job.name}"
-        if state.get(key) == fingerprint:
+        if state.get(key) == fingerprint and outputs_exist(output_dir, job.name):
+            continue
+
+        if not job.is_settled(settle_seconds):
+            LOG.debug("откладываю %s: файлы ещё обновляются", job.name)
             continue
 
         LOG.info("задача %s: %s (%d кадр.)", job.kind, job.name, len(job.frames))
@@ -149,6 +271,7 @@ def process_once(input_dir: Path, output_dir: Path, args: argparse.Namespace) ->
             manifest["preview"],
         )
 
+    write_index(output_dir)
     return processed
 
 
@@ -190,6 +313,47 @@ def add_compression_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def add_manifest_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--floor-id", default=os.getenv("CV_FLOOR_ID", ""))
+    parser.add_argument("--x", type=float, default=float(os.getenv("CV_X", "0")))
+    parser.add_argument("--y", type=float, default=float(os.getenv("CV_Y", "0")))
+    parser.add_argument(
+        "--yaw-offset",
+        type=float,
+        default=float(os.getenv("CV_YAW_OFFSET", "0")),
+    )
+    parser.add_argument(
+        "--hotspots-file",
+        type=Path,
+        default=None,
+        help="JSON-массив хотспотов для манифеста (по умолчанию hotspots.json рядом с кадрами)",
+    )
+
+
+def add_stitching_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--confidence-thresh",
+        type=float,
+        default=float(os.getenv("CV_CONFIDENCE_THRESH", str(DEFAULT_CONFIDENCE_THRESH))),
+    )
+    parser.add_argument("--no-wave-correction", action="store_true")
+    parser.add_argument(
+        "--registration-resol",
+        type=float,
+        default=float(os.getenv("CV_REGISTRATION_RESOL", str(DEFAULT_REGISTRATION_RESOL))),
+    )
+    parser.add_argument(
+        "--seam-resol",
+        type=float,
+        default=float(os.getenv("CV_SEAM_RESOL", str(DEFAULT_SEAM_RESOL))),
+    )
+    parser.add_argument(
+        "--compositing-resol",
+        type=float,
+        default=float(os.getenv("CV_COMPOSITING_RESOL", str(DEFAULT_COMPOSITING_RESOL))),
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="worker.py",
@@ -201,12 +365,15 @@ def build_parser() -> argparse.ArgumentParser:
     compress.add_argument("images", nargs="+", type=Path)
     compress.add_argument("-o", "--output-dir", type=Path, default=Path("panoramas"))
     add_compression_args(compress)
+    add_manifest_args(compress)
 
     stitch = subparsers.add_parser("stitch", help="сшить кадры и сжать результат")
     stitch.add_argument("frames", nargs="+", type=Path)
     stitch.add_argument("-n", "--name", required=True)
     stitch.add_argument("-o", "--output-dir", type=Path, default=Path("panoramas"))
     add_compression_args(stitch)
+    add_manifest_args(stitch)
+    add_stitching_args(stitch)
 
     watch = subparsers.add_parser("watch", help="следить за папкой загрузок")
     watch.add_argument(
@@ -226,8 +393,16 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=float(os.getenv("CV_WATCH_INTERVAL", "5")),
     )
+    watch.add_argument(
+        "--settle-seconds",
+        type=float,
+        default=float(os.getenv("CV_SETTLE_SECONDS", str(DEFAULT_SETTLE_SECONDS))),
+        help="не брать файлы, изменённые менее N секунд назад (0 — отключить)",
+    )
     watch.add_argument("--once", action="store_true", help="один проход и выход")
     add_compression_args(watch)
+    add_manifest_args(watch)
+    add_stitching_args(watch)
 
     return parser
 
@@ -244,22 +419,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         failures = 0
         for image in args.images:
             try:
-                result = compress_panorama(image, args.output_dir, **compression_options(args))
-                manifest = build_manifest(result, args.public_prefix)
-                write_manifest(args.output_dir, image.stem, manifest)
+                manifest = run_job(Job("compress", image.stem, [image]), args.output_dir, args)
                 LOG.info("готово %s -> %s", image, manifest["full"])
             except (OSError, ValueError) as exc:
                 failures += 1
                 LOG.error("ошибка %s: %s", image, exc)
+        write_index(args.output_dir)
         return 1 if failures else 0
 
     if args.command == "stitch":
         try:
-            result = stitch_and_compress(
-                args.frames, args.output_dir, args.name, **compression_options(args)
+            manifest = run_job(
+                Job("stitch", args.name, list(args.frames)),
+                args.output_dir,
+                args,
             )
-            manifest = build_manifest(result, args.public_prefix)
-            write_manifest(args.output_dir, args.name, manifest)
+            write_index(args.output_dir)
             LOG.info("готово %s -> %s", args.name, manifest["full"])
             return 0
         except (StitchingError, OSError, ValueError) as exc:

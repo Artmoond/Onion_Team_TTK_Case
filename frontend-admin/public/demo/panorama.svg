@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2048" height="1024" viewBox="0 0 2048 1024">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.55" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="floor" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#334155"/>
+      <stop offset="0.5" stop-color="#475569"/>
+      <stop offset="1" stop-color="#334155"/>
+    </linearGradient>
+  </defs>
+  <rect width="2048" height="1024" fill="url(#sky)"/>
+  <rect y="700" width="2048" height="324" fill="url(#floor)"/>
+  <g stroke="#38bdf8" stroke-width="3" opacity="0.7">
+    <line x1="0" y1="700" x2="2048" y2="700"/>
+    <line x1="0" y1="850" x2="2048" y2="850"/>
+    <line x1="512" y1="700" x2="400" y2="1024"/>
+    <line x1="1024" y1="700" x2="1024" y2="1024"/>
+    <line x1="1536" y1="700" x2="1648" y2="1024"/>
+  </g>
+  <g font-family="Arial, sans-serif" text-anchor="middle">
+    <text x="1024" y="470" font-size="64" font-weight="bold" fill="#f8fafc">ТТК · ЭКСПОЦЕНТР</text>
+    <text x="1024" y="535" font-size="28" fill="#94a3b8">Демонстрационная панорама 360° · 2:1</text>
+    <text x="1024" y="760" font-size="24" fill="#e2e8f0" opacity="0.7">Загрузите собственную панораму в редакторе</text>
+  </g>
+  <g fill="#E30613">
+    <rect x="700" y="560" width="648" height="12" rx="6" opacity="0.9"/>
+    <rect x="940" y="585" width="168" height="90" rx="10" fill="#7f1d1d" stroke="#fca5a5" stroke-width="3"/>
+    <text x="1024" y="640" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#fee2e2" text-anchor="middle">ТТК</text>
+  </g>
+</svg>

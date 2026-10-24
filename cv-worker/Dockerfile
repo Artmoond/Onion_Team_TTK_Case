@@ -10,6 +10,7 @@ ENV PYTHONUNBUFFERED=1 \
     CV_INPUT_DIR=/app/uploads \
     CV_OUTPUT_DIR=/app/uploads/panoramas \
     CV_WATCH_INTERVAL=5 \
+    CV_SETTLE_SECONDS=2 \
     CV_PUBLIC_PREFIX=/uploads/panoramas
 
 COPY requirements.txt .

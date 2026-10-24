@@ -42,6 +42,16 @@ def test_compress_creates_full_and_preview(tmp_path):
         assert image.size == (1024, 512)
 
 
+def test_preview_is_not_upscaled(tmp_path):
+    source = make_image(tmp_path / "small.png", (800, 400))
+    result = compress_panorama(source, tmp_path / "out")
+
+    assert result["width"] == 800
+    assert result["previewWidth"] == 800
+    assert result["previewHeight"] == 400
+    assert not list((tmp_path / "out").glob(".*.tmp"))
+
+
 def test_compress_non_equirectangular_is_cropped(tmp_path):
     source = make_image(tmp_path / "square.png", (2000, 2000))
     result = compress_panorama(source, tmp_path / "out")
@@ -57,3 +67,31 @@ def test_manifest_contains_public_urls(tmp_path):
     assert manifest["url"] == "/uploads/panoramas/lobby.webp"
     assert manifest["previewUrl"] == "/uploads/panoramas/lobby_preview.webp"
     assert public_url("/uploads/panoramas/", "/x/y.webp") == "/uploads/panoramas/y.webp"
+    assert public_url("", "/x/y.webp") == "y.webp"
+
+
+def test_manifest_has_panorama_fields_and_relative_urls(tmp_path):
+    source = make_image(tmp_path / "lobby.png", (2048, 1024))
+    result = compress_panorama(source, tmp_path / "out")
+    hotspots = [{"id": "h1", "yaw": 10, "pitch": 0, "type": "info", "text": "Вход"}]
+
+    manifest = build_manifest(
+        result,
+        "",
+        metadata={
+            "floorId": "floor-1",
+            "x": 600,
+            "y": 400,
+            "yawOffset": 90,
+            "hotspots": hotspots,
+        },
+    )
+
+    assert manifest["type"] == "panorama"
+    assert manifest["url"] == "lobby.webp"
+    assert manifest["previewUrl"] == "lobby_preview.webp"
+    assert manifest["floorId"] == "floor-1"
+    assert manifest["x"] == 600
+    assert manifest["y"] == 400
+    assert manifest["yawOffset"] == 90
+    assert manifest["hotspots"] == hotspots
