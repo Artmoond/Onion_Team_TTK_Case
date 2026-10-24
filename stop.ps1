@@ -1,4 +1,4 @@
-# Скрипт остановки сервисов ТТК
+﻿# Скрипт остановки сервисов ТТК
 Write-Host "Остановка контейнеров ТТК..." -ForegroundColor Yellow
 
 $winPath = (Get-Location).Path
