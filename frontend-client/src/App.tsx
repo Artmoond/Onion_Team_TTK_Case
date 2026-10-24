@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import 'pannellum/build/pannellum.css';
 import 'pannellum';
-import { Compass, Navigation, Eye, MapPin, Search, Layers, X, Coffee, Award, DoorOpen, Users } from 'lucide-react';
+import { Compass, Navigation, Eye, MapPin, Search, Layers, X, Coffee, Award, DoorOpen, Users, LogOut, UserRound } from 'lucide-react';
+import AuthScreen from './components/AuthScreen';
+import { API_URL, clearSession, logoutSession, restoreSession, type Session } from './lib/auth';
 
 interface POI {
   id: string;
@@ -25,7 +27,29 @@ export default function App() {
   const [activePanoUrl, setActivePanoUrl] = useState<string>('/demo-pano.webp');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [session, setSession] = useState<Session | null>(null);
+  const [booting, setBooting] = useState<boolean>(true);
   const viewerRef = useRef<any>(null);
+
+  useEffect(() => {
+    let active = true;
+    restoreSession()
+      .then((restored) => {
+        if (!active) return;
+        if (restored && restored.user.role !== 'user') {
+          clearSession();
+          setSession(null);
+          return;
+        }
+        setSession(restored);
+      })
+      .finally(() => {
+        if (active) setBooting(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!showPanoModal) return;
@@ -66,7 +90,7 @@ export default function App() {
 
   const buildRouteTo = async (poi: POI) => {
     try {
-      const res = await fetch('http://localhost:8000/api/public/ttk-expo/route', {
+      const res = await fetch(`${API_URL}/api/public/ttk-expo/route`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fromPoiId: 'poi-entrance', toPoiId: poi.id })
@@ -102,6 +126,32 @@ export default function App() {
     return matchCat && matchSearch;
   });
 
+  const handleLogout = async () => {
+    await logoutSession();
+    setSession(null);
+  };
+
+  if (booting) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-950 text-slate-100">
+        <div className="flex items-center gap-3 text-sm text-slate-400">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-700 border-t-[#E30613]" />
+          Проверяем сессию…
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <AuthScreen
+        mode="user"
+        alternateUrl={import.meta.env.VITE_ADMIN_URL || 'http://localhost:3001'}
+        onAuthenticated={setSession}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 font-sans text-slate-100">
       {/* Верхняя мобильная шапка */}
@@ -111,6 +161,22 @@ export default function App() {
           <span className="font-bold text-sm tracking-tight text-white">Карта Пространства</span>
         </div>
         <div className="flex items-center space-x-2">
+          <div
+            className="flex items-center gap-1.5 bg-slate-800 border border-slate-700 rounded-full pl-1.5 pr-1 py-0.5"
+            title={session.user.email}
+          >
+            <span className="w-6 h-6 rounded-full bg-[#E30613] flex items-center justify-center">
+              <UserRound className="w-3.5 h-3.5 text-white" />
+            </span>
+            <span className="text-[11px] text-slate-200 max-w-[90px] truncate">{session.user.fullName}</span>
+            <button
+              onClick={() => { void handleLogout(); }}
+              title="Выйти"
+              className="text-slate-400 hover:text-red-400 p-1 rounded-full hover:bg-slate-700/70 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
           <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full border border-slate-700 flex items-center gap-1">
             <Layers className="w-3 h-3 text-[#E30613]" /> 1 этаж
           </span>

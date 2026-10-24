@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Plus, MapPin, Eye, Share2, Download, Check, Trash2, Layers, Move, GitFork, Image as ImageIcon } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Plus, MapPin, Eye, Share2, Download, Check, Trash2, Layers, Move, GitFork, Image as ImageIcon, LogOut, ShieldCheck } from 'lucide-react';
+import AuthScreen from './components/AuthScreen';
+import { clearSession, logoutSession, restoreSession, type Session } from './lib/auth';
 
 interface POI {
   id: string;
@@ -10,7 +12,12 @@ interface POI {
   y: number;
 }
 
-export default function App() {
+interface StudioProps {
+  session: Session;
+  onLogout: () => Promise<void>;
+}
+
+function Studio({ session, onLogout }: StudioProps) {
   const [editorMode, setEditorMode] = useState<'select' | 'poi' | 'graph' | 'pano'>('poi');
   const [pois, setPois] = useState<POI[]>([
     { id: 'p1', name: 'Главный стенд ТТК', category: 'sponsor', description: 'Квантовые сети и сервисы', x: 600, y: 400 },
@@ -68,6 +75,22 @@ export default function App() {
           <span className="text-xs text-emerald-400 flex items-center gap-1.5 bg-emerald-950/60 border border-emerald-800/60 px-3 py-1 rounded-full">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Автосохранение активно
           </span>
+          <div className="hidden md:flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-lg pl-2.5 pr-2 py-1.5">
+            <span className="w-6 h-6 rounded-full bg-[#E30613] flex items-center justify-center">
+              <ShieldCheck className="w-3.5 h-3.5 text-white" />
+            </span>
+            <div className="leading-tight">
+              <div className="text-[11px] font-bold text-white max-w-[150px] truncate">{session.user.fullName}</div>
+              <div className="text-[9px] uppercase tracking-wider text-emerald-400">Организатор</div>
+            </div>
+            <button
+              onClick={() => { void onLogout(); }}
+              title="Выйти"
+              className="ml-1 text-slate-400 hover:text-red-400 p-1.5 rounded-md hover:bg-slate-700/60 transition-colors"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+          </div>
           <button 
             onClick={() => setShowQrModal(true)}
             className="flex items-center gap-1.5 bg-[#E30613] hover:bg-red-700 text-white font-bold text-xs py-1.5 px-3.5 rounded-lg shadow-lg active:scale-95 transition-all"
@@ -270,4 +293,59 @@ export default function App() {
       )}
     </div>
   );
+}
+
+const CLIENT_URL = import.meta.env.VITE_CLIENT_URL || 'http://localhost:3000';
+
+export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [booting, setBooting] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    restoreSession()
+      .then((restored) => {
+        if (!active) return;
+        if (restored && restored.user.role !== 'admin') {
+          clearSession();
+          setSession(null);
+          return;
+        }
+        setSession(restored);
+      })
+      .finally(() => {
+        if (active) setBooting(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    await logoutSession();
+    setSession(null);
+  };
+
+  if (booting) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-slate-950 text-slate-100">
+        <div className="flex items-center gap-3 text-sm text-slate-400">
+          <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-700 border-t-[#E30613]" />
+          Проверяем сессию…
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <AuthScreen
+        mode="admin"
+        alternateUrl={CLIENT_URL}
+        onAuthenticated={setSession}
+      />
+    );
+  }
+
+  return <Studio session={session} onLogout={handleLogout} />;
 }

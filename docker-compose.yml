@@ -15,6 +15,16 @@ services:
       - ./data/uploads:/app/uploads
     environment:
       - PYTHONUNBUFFERED=1
+      # Авторизация. Для боевого сервера обязательно задайте свой TTK_JWT_SECRET.
+      - TTK_JWT_SECRET=${TTK_JWT_SECRET:-ttk-dev-secret-change-me-7f4c2a91b8e35d6c0a4f9e2d1b7c8a63}
+      - TTK_AUTH_DB=/app/data/auth.db
+      - TTK_ADMIN_INVITE_CODE=${TTK_ADMIN_INVITE_CODE:-TTK-ADMIN-2026}
+      - TTK_ADMIN_EMAIL=${TTK_ADMIN_EMAIL:-admin@ttk.local}
+      - TTK_ADMIN_PASSWORD=${TTK_ADMIN_PASSWORD:-Admin12345!}
+      - TTK_USER_EMAIL=${TTK_USER_EMAIL:-user@ttk.local}
+      - TTK_USER_PASSWORD=${TTK_USER_PASSWORD:-User12345!}
+      - TTK_TRUST_PROXY=${TTK_TRUST_PROXY:-false}
+      - TTK_CORS_ORIGINS=${TTK_CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001}
     restart: unless-stopped
 
   # Мобильный веб-клиент посетителя (Участник №1)
@@ -31,6 +41,7 @@ services:
       - ./shared:/app/shared
     environment:
       - VITE_API_URL=http://localhost:8000
+      - VITE_ADMIN_URL=http://localhost:3001
     depends_on:
       - backend
     restart: unless-stopped
@@ -49,6 +60,7 @@ services:
       - ./shared:/app/shared
     environment:
       - VITE_API_URL=http://localhost:8000
+      - VITE_CLIENT_URL=http://localhost:3000
     depends_on:
       - backend
     restart: unless-stopped

@@ -4,11 +4,16 @@ import re
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from urllib.parse import quote
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from app.auth import config as auth_config
+from app.auth.db import cleanup_expired_tokens
+from app.auth.deps import require_admin
+from app.auth.router import router as auth_router
 from app.core.pathfinder import calculate_indoor_route
 
 app = FastAPI(
@@ -17,14 +22,79 @@ app = FastAPI(
     description="Backend API для indoor-навигации, 2D-планов и 360-панорам"
 )
 
-# Разрешаем CORS для всех локальных портов фронтенда (клиент на 3000, админка на 3001)
+# Включаем маршруты /api/auth/* (регистрация, вход, refresh, профиль).
+app.include_router(auth_router)
+
+# Разрешаем CORS только известным фронтендам. Список можно расширить через env.
+_cors_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "TTK_CORS_ORIGINS",
+        (
+            "http://localhost:3000,http://localhost:3001,"
+            "http://127.0.0.1:3000,http://127.0.0.1:3001"
+        ),
+    ).split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    # Ограничиваем размер JSON-тела: защита от «тяжёлых» запросов и DoS.
+    if request.url.path.startswith("/api/") and request.url.path != "/api/upload":
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > auth_config.MAX_JSON_BODY_BYTES:
+                    return JSONResponse(
+                        status_code=413,
+                        content={"detail": "Слишком большой размер запроса"},
+                    )
+            except ValueError:
+                return JSONResponse(
+                    status_code=400,
+                    content={"detail": "Некорректный Content-Length"},
+                )
+
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "geolocation=(), microphone=()")
+
+    # Токены и профиль не должны попадать в кэш браузера/прокси.
+    if request.url.path.startswith("/api/auth/"):
+        response.headers.setdefault("Cache-Control", "no-store")
+        response.headers.setdefault("Pragma", "no-cache")
+
+    # Загруженные SVG/HTML не должны исполнять скрипты на домене API.
+    if request.url.path.startswith("/uploads/"):
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox",
+        )
+        response.headers.setdefault("Content-Disposition", "inline")
+
+    if request.headers.get("x-forwarded-proto", "").lower() == "https":
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+        )
+    return response
+
+
+@app.on_event("startup")
+def cleanup_auth_tokens_on_startup() -> None:
+    # Удаляем просроченные refresh-токены, чтобы таблица не росла бесконечно.
+    cleanup_expired_tokens()
+
 
 UPLOAD_DIR = Path(os.getenv("TTK_UPLOAD_DIR", "/app/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -129,11 +199,11 @@ def list_panoramas():
 
 # --- API ОРГАНИЗАТОРА (ДЛЯ АДМИНКИ) ---
 @app.get("/api/venues")
-def list_venues():
+def list_venues(_admin=Depends(require_admin)):
     return list(local_venues_db.values())
 
 @app.put("/api/venues/{slug}")
-def save_venue(slug: str, updated_venue: Dict[str, Any]):
+def save_venue(slug: str, updated_venue: Dict[str, Any], _admin=Depends(require_admin)):
     local_venues_db[slug] = updated_venue
     return {"status": "saved", "slug": slug}
 
@@ -155,6 +225,7 @@ def _safe_upload_name(filename: str) -> str:
 async def upload_file(
     file: UploadFile = File(...),
     folder: Optional[str] = Form(None),
+    _admin=Depends(require_admin),
 ):
     """Загружает файл в /app/uploads или в /app/uploads/<folder>.
 
