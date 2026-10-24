@@ -1,3 +1,10 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.vscode
+.git
 __pycache__/
 *.py[cod]
 .pytest_cache/
