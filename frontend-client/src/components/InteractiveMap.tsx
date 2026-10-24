@@ -20,6 +20,7 @@ interface InteractiveMapProps {
   pois: POI[];
   selectedPoi: POI | null;
   onSelectPoi: (poi: POI) => void;
+  onClearSelectedPoi: () => void;
   activeRoute: RouteResponse | null;
   onOpenPanorama: (panoId: string) => void;
   activeZoneId: string | null;
@@ -51,6 +52,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   pois,
   selectedPoi,
   onSelectPoi,
+  onClearSelectedPoi,
   activeRoute,
   onOpenPanorama,
   activeZoneId,
@@ -266,7 +268,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     setScale(BASE_SCALE);
     setTranslate({ x: 0, y: 0 });
     onZoneChange(null);
-  }, [onZoneChange]);
+    onClearSelectedPoi();
+  }, [onZoneChange, onClearSelectedPoi]);
 
   // Зум к конкретной зоне
   const handleZoomToZone = (zone: MapZone) => {
@@ -287,11 +290,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Зум кнопками
   const handleZoom = (delta: number) => {
+    if (delta < 0) {
+      // Пользователь отдаляется — убираем карточку информации!
+      onClearSelectedPoi();
+    }
     setScale(prev => {
       const next = Math.min(MAX_SCALE, Math.max(BASE_SCALE, Number((prev + delta).toFixed(2))));
       if (next <= BASE_SCALE) {
         setTranslate({ x: 0, y: 0 });
         onZoneChange(null);
+        onClearSelectedPoi();
       }
       return next;
     });
@@ -301,6 +309,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 0.15 : -0.15;
+    if (zoomFactor < 0) {
+      // Отдаление колесиком — убираем карточку информации
+      onClearSelectedPoi();
+    }
     handleZoom(zoomFactor);
   };
 
@@ -363,6 +375,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       );
       const diff = newDist - touchDistRef.current;
       if (Math.abs(diff) > 2) {
+        if (diff < 0) {
+          onClearSelectedPoi();
+        }
         const factor = diff > 0 ? 0.03 : -0.03;
         setScale(prev => {
           const next = Math.min(MAX_SCALE, Math.max(BASE_SCALE, prev + factor));
@@ -948,17 +963,19 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   transform: `translate(${pano.x}px, ${pano.y}px) ${isHovered ? 'scale(1.4)' : 'scale(1)'}`,
                 }}
               >
-                {/* Компактный значок 360 */}
+                {/* Идеально выровненная эмблема 360 */}
                 <circle
                   cx="0"
                   cy="0"
-                  r="15"
+                  r="16"
                   fill="#0284c7"
                   stroke="white"
                   strokeWidth="2.5"
                   className="shadow-xl"
                 />
-                <Camera className="w-4 h-4 text-white -translate-x-2 -translate-y-2 pointer-events-none" />
+                <g transform="translate(-9, -9)" pointerEvents="none">
+                  <Camera size={18} color="white" strokeWidth={2.2} />
+                </g>
 
                 {/* Всплывающий текст СНИЗУ («снизу появляется текст что это да кто это») */}
                 {isHovered && (
@@ -1023,17 +1040,19 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   />
                 )}
 
-                {/* Эмблема категории */}
+                {/* Идеально выровненная эмблема категории */}
                 <circle
                   cx="0"
                   cy="0"
-                  r="15"
+                  r="16"
                   fill={details.bg}
                   stroke="white"
                   strokeWidth="2.5"
                   className="shadow-lg"
                 />
-                <Icon className="w-4 h-4 text-white -translate-x-2 -translate-y-2 pointer-events-none" />
+                <g transform="translate(-9, -9)" pointerEvents="none">
+                  <Icon size={18} color="white" strokeWidth={2.2} />
+                </g>
 
                 {/* Всплывающий текст СНИЗУ («снизу появляется текст что это да кто это») */}
                 {showTooltip && (

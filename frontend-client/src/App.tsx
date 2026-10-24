@@ -89,7 +89,14 @@ export default function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showVirtualWalk, showPanoModal, selectedPoi, activeRoute]);
+  }, [showVirtualWalk, showPanoModal, selectedPoi, activeRoute, activeZoneId]);
+
+  // Закрываем карточку POI при выходе из комнаты (отдалении к общему плану)
+  useEffect(() => {
+    if (!activeZoneId) {
+      setSelectedPoi(null);
+    }
+  }, [activeZoneId]);
 
   // Подсчет количества точек по категориям для текущего этажа
   const categoryCounts = useMemo(() => {
@@ -217,6 +224,7 @@ export default function App() {
         onSelectPoi={poi => {
           setSelectedPoi(poi);
         }}
+        onClearSelectedPoi={() => setSelectedPoi(null)}
         activeRoute={activeRoute}
         onOpenPanorama={handleOpenPanorama}
         activeZoneId={activeZoneId}
