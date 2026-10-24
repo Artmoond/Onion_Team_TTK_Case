@@ -27,6 +27,7 @@ services:
       - TTK_USER_PASSWORD=${TTK_USER_PASSWORD:-User12345!}
       - TTK_TRUST_PROXY=${TTK_TRUST_PROXY:-false}
       - TTK_CORS_ORIGINS=${TTK_CORS_ORIGINS:-http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://127.0.0.1:3001}
+      - PYTHONDONTWRITEBYTECODE=1
     restart: unless-stopped
 
   # Мобильный веб-клиент посетителя (Участник №1)

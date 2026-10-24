@@ -19,13 +19,22 @@ interface RouteInfo {
   estimatedDurationSeconds: number;
   points: [number, number][];
 }
+import React, { useState, useEffect, useMemo } from 'react';
+import { Venue, Floor, POI, RouteResponse, Panorama } from './types';
+import { mockVenue } from './data/mockData';
+import { calculateClientRoute } from './utils/pathfinder';
+import { Header } from './components/Header';
+import { CategoryFilters } from './components/CategoryFilters';
+import { InteractiveMap } from './components/InteractiveMap';
+import { PoiSheet } from './components/PoiSheet';
+import { RouteDrawer } from './components/RouteDrawer';
+import { PanoModal } from './components/PanoModal';
+import { VirtualWalkModal } from './components/VirtualWalkModal';
 
 export default function App() {
-  const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
-  const [activeRoute, setActiveRoute] = useState<RouteInfo | null>(null);
-  const [showPanoModal, setShowPanoModal] = useState<boolean>(false);
-  const [activePanoUrl, setActivePanoUrl] = useState<string>('/demo-pano.webp');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [venue, setVenue] = useState<Venue>(mockVenue);
+  const [activeFloorId, setActiveFloorId] = useState<string>('floor-1');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [session, setSession] = useState<Session | null>(null);
   const [booting, setBooting] = useState<boolean>(true);
@@ -54,39 +63,45 @@ export default function App() {
   useEffect(() => {
     if (!showPanoModal) return;
 
-    const container = document.getElementById('pano-container');
-    const pannellum = (window as any).pannellum;
-    if (!container || !pannellum) return;
+  const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
+  const [activeRoute, setActiveRoute] = useState<RouteResponse | null>(null);
+  const [routeTargetPoi, setRouteTargetPoi] = useState<POI | null>(null);
+  const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
 
-    viewerRef.current = pannellum.viewer(container, {
-      type: 'equirectangular',
-      panorama: activePanoUrl,
-      autoLoad: true,
-      compass: true
-    });
+  const [activePanoId, setActivePanoId] = useState<string | null>(null);
+  const [showPanoModal, setShowPanoModal] = useState<boolean>(false);
+  const [showVirtualWalk, setShowVirtualWalk] = useState<boolean>(false);
 
-    return () => {
+  const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
+
+  // Активный этаж
+  const activeFloor: Floor = useMemo(() => {
+    return venue.floors.find(f => f.id === activeFloorId) || venue.floors[0];
+  }, [venue, activeFloorId]);
+
+  // Проверка связи с бэкендом при старте
+  useEffect(() => {
+    const checkBackend = async () => {
       try {
-        viewerRef.current?.destroy();
+        const res = await fetch('http://localhost:8000/api/health', { method: 'GET' });
+        if (res.ok) {
+          setIsBackendConnected(true);
+          // Попытка загрузить актуальную площадку с бэкенда
+          const venueRes = await fetch('http://localhost:8000/api/public/ttk-expo');
+          if (venueRes.ok) {
+            const data = await venueRes.json();
+            if (data && data.floors && data.floors.length > 0) {
+              setVenue(data);
+            }
+          }
+        }
       } catch {
-        // viewer already destroyed
+        // Бэкенд офлайн — продолжаем в автономном режиме
+        setIsBackendConnected(false);
       }
-      viewerRef.current = null;
     };
-  }, [showPanoModal, activePanoUrl]);
-
-  // Базовые точки на плане (1200x800)
-  const pois: POI[] = [
-    { id: 'poi-entrance', name: 'Главный вход & Регистрация', category: 'service', description: 'Стойка регистрации участников, гардероб и навигационный стенд ТТК.', x: 600, y: 740 },
-    { id: 'poi-ttk-stand', name: 'Центральный стенд ТТК', category: 'sponsor', description: 'Инновации indoor-навигации, квантовые сети и цифровые сервисы ТрансТелеКом.', x: 600, y: 400 },
-    { id: 'poi-main-hall', name: 'Конференц-зал «Сириус»', category: 'hall', description: 'Главная сцена: пленарные сессии, защита проектов хакатона.', x: 250, y: 300 },
-    { id: 'poi-food', name: 'Кофе-брейк и зона отдыха', category: 'food', description: 'Свежий кофе, снеки, зарядные станции и комфортные диваны.', x: 950, y: 300 },
-    { id: 'poi-wc', name: 'Санузлы', category: 'wc', description: 'Мужской, женский и санузел для маломобильных групп.', x: 1050, y: 700 }
-  ];
-
-  const handleSelectPoi = (poi: POI) => {
-    setSelectedPoi(poi);
-  };
+    checkBackend();
+  }, []);
 
   const buildRouteTo = async (poi: POI) => {
     try {
@@ -101,30 +116,140 @@ export default function App() {
           totalDistanceMeters: data.totalDistanceMeters,
           estimatedDurationSeconds: data.estimatedDurationSeconds,
           points: data.legs[0].points
-        });
-      } else {
-        throw new Error('Fallback to client route');
+  // Поддержка query-параметров (?poi=poi-ttk-stand)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const poiParam = params.get('poi');
+    if (poiParam) {
+      for (const fl of venue.floors) {
+        const found = fl.points.find(p => p.id === poiParam);
+        if (found) {
+          setActiveFloorId(fl.id);
+          setSelectedPoi(found);
+          break;
+        }
       }
-    } catch {
-      // Клиентский фолбэк для автономного демо
-      setActiveRoute({
-        totalDistanceMeters: 28.5,
-        estimatedDurationSeconds: 24,
-        points: [[600, 740], [600, 500], [poi.x, poi.y]]
-      });
     }
+  }, [venue]);
+
+  // Закрытие окон по Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showVirtualWalk) setShowVirtualWalk(false);
+        else if (showPanoModal) setShowPanoModal(false);
+        else if (selectedPoi) setSelectedPoi(null);
+        else if (activeRoute) {
+          setActiveRoute(null);
+          setRouteTargetPoi(null);
+        } else if (activeZoneId) {
+          setActiveZoneId(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showVirtualWalk, showPanoModal, selectedPoi, activeRoute, activeZoneId]);
+
+  // Закрываем карточку POI при выходе из комнаты (отдалении к общему плану)
+  useEffect(() => {
+    if (!activeZoneId) {
+      setSelectedPoi(null);
+    }
+  }, [activeZoneId]);
+
+  // Подсчет количества точек по категориям для текущего этажа
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: activeFloor.points.length };
+    for (const p of activeFloor.points) {
+      counts[p.category] = (counts[p.category] || 0) + 1;
+    }
+    return counts;
+  }, [activeFloor]);
+
+  // Фильтрация точек интереса для поиска
+  const searchFilteredPois = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return activeFloor.points;
+    return activeFloor.points.filter(poi =>
+      poi.name.toLowerCase().includes(q) ||
+      (poi.description && poi.description.toLowerCase().includes(q)) ||
+      (poi.tags && poi.tags.some(t => t.toLowerCase().includes(q)))
+    );
+  }, [activeFloor, searchQuery]);
+
+  // Автозум к зоне при поиске: если нашли 1 уникальный результат — автоматически выбираем
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    if (searchFilteredPois.length === 1) {
+      // Единственный результат — выбираем его автоматически (InteractiveMap сам зумирует)
+      setSelectedPoi(searchFilteredPois[0]);
+    }
+  }, [searchQuery, searchFilteredPois.length]);
+
+  // Построение маршрута
+  const handleBuildRoute = async (target: POI) => {
+    setSelectedPoi(null);
+    setRouteTargetPoi(target);
+
+    // Координаты старта: точка входа на текущем этаже
+    const entrancePoi = activeFloor.points.find(p => p.category === 'entrance') || activeFloor.points[0];
+    const fromX = entrancePoi ? entrancePoi.x : 600;
+    const fromY = entrancePoi ? entrancePoi.y : 740;
+
+    // 1. Попытка запроса к бэкенду
+    if (isBackendConnected) {
+      try {
+        const res = await fetch('http://localhost:8000/api/public/ttk-expo/route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromPoiId: entrancePoi?.id || 'poi-entrance',
+            toPoiId: target.id,
+          }),
+        });
+        if (res.ok) {
+          const data: RouteResponse = await res.json();
+          setActiveRoute(data);
+          return;
+        }
+      } catch (err) {
+        console.warn('Backend route calculation failed, using client pathfinder:', err);
+      }
+    }
+
+    // 2. Автономный расчет маршрута (Client-Side A* Pathfinder)
+    const clientRoute = calculateClientRoute(
+      activeFloor,
+      fromX,
+      fromY,
+      target.x,
+      target.y,
+      entrancePoi?.name || 'Главный вход',
+      target.name
+    );
+    setActiveRoute(clientRoute);
   };
 
-  const openPanorama = (url?: string) => {
-    if (url) setActivePanoUrl(url);
+  const handleClearRoute = () => {
+    setActiveRoute(null);
+    setRouteTargetPoi(null);
+  };
+
+  // Открытие панорамы 360°
+  const handleOpenPanorama = (panoId: string) => {
+    setActivePanoId(panoId);
     setShowPanoModal(true);
   };
 
-  const filteredPois = pois.filter(p => {
-    const matchCat = filterCategory === 'all' || p.category === filterCategory;
-    const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchCat && matchSearch;
-  });
+  const activePanorama: Panorama | undefined = useMemo(() => {
+    if (!activePanoId) return activeFloor.panoramas[0];
+    for (const fl of venue.floors) {
+      const found = fl.panoramas.find(p => p.id === activePanoId);
+      if (found) return found;
+    }
+    return activeFloor.panoramas[0];
+  }, [activePanoId, activeFloor, venue]);
 
   const handleLogout = async () => {
     await logoutSession();
@@ -180,131 +305,102 @@ export default function App() {
           <span className="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded-full border border-slate-700 flex items-center gap-1">
             <Layers className="w-3 h-3 text-[#E30613]" /> 1 этаж
           </span>
-        </div>
-      </header>
+    <div className="flex flex-col h-screen w-screen bg-slate-950 font-sans text-slate-100 overflow-hidden relative">
+      {/* 1. Верхний адаптивный хедер с поиском и этажами */}
+      <Header
+        floors={venue.floors}
+        activeFloorId={activeFloorId}
+        onSelectFloor={id => {
+          setActiveFloorId(id);
+          setSelectedPoi(null);
+          setActiveRoute(null);
+          setActiveZoneId(null);
+        }}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        isBackendConnected={isBackendConnected}
+        searchResults={searchFilteredPois}
+        onSelectSearchResult={poi => {
+          setSelectedPoi(poi);
+          setSearchQuery('');
+        }}
+      />
 
-      {/* Быстрые фильтры категорий */}
-      <div className="flex space-x-2 px-3 py-2 bg-slate-900/90 border-b border-slate-800/80 overflow-x-auto no-scrollbar z-10">
-        <button onClick={() => setFilterCategory('all')} className={`text-xs px-3 py-1 rounded-full shrink-0 transition-colors ${filterCategory === 'all' ? 'bg-[#E30613] text-white font-bold' : 'bg-slate-800 text-slate-300'}`}>Все</button>
-        <button onClick={() => setFilterCategory('sponsor')} className={`text-xs px-3 py-1 rounded-full shrink-0 transition-colors ${filterCategory === 'sponsor' ? 'bg-[#E30613] text-white font-bold' : 'bg-slate-800 text-slate-300'}`}>Стенды</button>
-        <button onClick={() => setFilterCategory('hall')} className={`text-xs px-3 py-1 rounded-full shrink-0 transition-colors ${filterCategory === 'hall' ? 'bg-[#E30613] text-white font-bold' : 'bg-slate-800 text-slate-300'}`}>Залы</button>
-        <button onClick={() => setFilterCategory('food')} className={`text-xs px-3 py-1 rounded-full shrink-0 transition-colors ${filterCategory === 'food' ? 'bg-[#E30613] text-white font-bold' : 'bg-slate-800 text-slate-300'}`}>Кофе</button>
+      {/* 2. Область карты с плавающим вертикальным меню фильтров слева */}
+      <div className="relative flex-1 w-full h-full overflow-hidden">
+        <InteractiveMap
+          floor={activeFloor}
+          pois={activeFloor.points}
+          selectedPoi={selectedPoi}
+          onSelectPoi={poi => {
+            setSelectedPoi(poi);
+          }}
+          onClearSelectedPoi={() => setSelectedPoi(null)}
+          activeRoute={activeRoute}
+          onOpenPanorama={handleOpenPanorama}
+          activeZoneId={activeZoneId}
+          onZoneChange={setActiveZoneId}
+          selectedCategory={selectedCategory}
+        />
+
+        {/* Вертикальная менюшка категорий слева (сворачивается при зуме в помещение или маршруте) */}
+        <div
+          className={`absolute left-3 top-4 z-20 transition-all duration-300 ease-in-out ${
+            activeZoneId || activeRoute
+              ? '-translate-x-56 opacity-0 pointer-events-none'
+              : 'translate-x-0 opacity-100'
+          }`}
+        >
+          <CategoryFilters
+            selectedCategory={selectedCategory}
+            onSelectCategory={cat => setSelectedCategory(cat)}
+            categoryCounts={categoryCounts}
+          />
+        </div>
       </div>
 
-      {/* Интерактивная 2D Карта (SVG с масштабированием) */}
-      <main className="flex-1 relative overflow-hidden flex items-center justify-center p-2">
-        <div className="w-full h-full max-w-4xl max-h-[85vh] bg-slate-900 rounded-xl border border-slate-800 relative shadow-2xl overflow-hidden flex items-center justify-center">
-          <svg viewBox="0 0 1200 800" className="w-full h-full object-contain">
-            {/* Сетка и план здания */}
-            <rect x="50" y="50" width="1100" height="700" rx="16" fill="#0f172a" stroke="#334155" strokeWidth="3" />
-            
-            {/* Коридоры */}
-            <rect x="500" y="250" width="200" height="490" fill="#1e293b" opacity="0.6" />
-            <rect x="200" y="260" width="800" height="90" fill="#1e293b" opacity="0.6" />
-
-            {/* Зоны помещений */}
-            <rect x="100" y="100" width="350" height="350" rx="10" fill="#1e293b" stroke="#475569" strokeWidth="2" />
-            <text x="275" y="220" textAnchor="middle" fill="#94a3b8" fontSize="18" fontWeight="bold">Зал «Сириус»</text>
-
-            <rect x="800" y="100" width="300" height="350" rx="10" fill="#1e293b" stroke="#475569" strokeWidth="2" />
-            <text x="950" y="220" textAnchor="middle" fill="#94a3b8" fontSize="18" fontWeight="bold">Кофе-брейк</text>
-
-            <circle cx="600" cy="400" r="110" fill="#e30613" fillOpacity="0.1" stroke="#e30613" strokeWidth="2" strokeDasharray="6,4" />
-            <text x="600" y="470" textAnchor="middle" fill="#e30613" fontSize="16" fontWeight="bold">Стенд ТТК</text>
-
-            {/* Отрисовка маршрута, если построен */}
-            {activeRoute && activeRoute.points.length > 1 && (
-              <polyline
-                points={activeRoute.points.map(p => p.join(',')).join(' ')}
-                fill="none"
-                stroke="#38bdf8"
-                strokeWidth="6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="animate-pulse"
-              />
-            )}
-
-            {/* Точки панорам (глазки 360) */}
-            <g onClick={() => openPanorama('/demo-pano.webp')} className="cursor-pointer">
-              <circle cx="600" cy="700" r="18" fill="#0284c7" />
-              <text x="600" y="705" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">360</text>
-            </g>
-            <g onClick={() => openPanorama('/demo-pano-2.webp')} className="cursor-pointer">
-              <circle cx="600" cy="400" r="18" fill="#e30613" />
-              <text x="600" y="405" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">360</text>
-            </g>
-
-            {/* POI Маркеры */}
-            {filteredPois.map(poi => (
-              <g 
-                key={poi.id} 
-                transform={`translate(${poi.x}, ${poi.y})`}
-                onClick={() => handleSelectPoi(poi)}
-                className="cursor-pointer transition-transform hover:scale-125"
-              >
-                <circle cx="0" cy="0" r="14" fill={poi.category === 'sponsor' ? '#E30613' : '#38bdf8'} stroke="white" strokeWidth="2" />
-                <circle cx="0" cy="0" r="5" fill="white" />
-              </g>
-            ))}
-          </svg>
-        </div>
-      </main>
-
-      {/* Нижняя карточка выбранной точки (Bottom Sheet) */}
-      {selectedPoi && (
-        <div className="absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700 p-4 rounded-t-2xl shadow-2xl z-20 transition-transform">
-          <div className="flex justify-between items-start mb-2">
-            <div>
-              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                {selectedPoi.category}
-              </span>
-              <h2 className="text-base font-bold text-white mt-1">{selectedPoi.name}</h2>
-            </div>
-            <button onClick={() => setSelectedPoi(null)} className="text-slate-400 hover:text-white p-1">
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <p className="text-xs text-slate-400 mb-4">{selectedPoi.description}</p>
-          <div className="grid grid-cols-2 gap-2">
-            <button 
-              onClick={() => buildRouteTo(selectedPoi)} 
-              className="flex items-center justify-center gap-1.5 bg-[#E30613] hover:bg-red-700 text-white font-bold text-xs py-2.5 px-3 rounded-lg shadow-lg active:scale-95 transition-all"
-            >
-              <Navigation className="w-4 h-4" /> Маршрут сюда
-            </button>
-            <button 
-              onClick={() => openPanorama()} 
-              className="flex items-center justify-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-cyan-500/30 font-bold text-xs py-2.5 px-3 rounded-lg active:scale-95 transition-all"
-            >
-              <Eye className="w-4 h-4" /> В панораму 360°
-            </button>
-          </div>
-          {activeRoute && (
-            <div className="mt-3 pt-2 border-t border-slate-800 flex justify-between text-xs text-slate-300">
-              <span>Расстояние: <strong className="text-cyan-400">{activeRoute.totalDistanceMeters} м</strong></span>
-              <span>Время в пути: <strong className="text-cyan-400">~{activeRoute.estimatedDurationSeconds} сек</strong></span>
-            </div>
-          )}
-        </div>
+      {/* 4. Шторка информации о выбранной точке (Bottom Sheet) */}
+      {selectedPoi && !activeRoute && (
+        <PoiSheet
+          poi={selectedPoi}
+          floor={activeFloor}
+          onClose={() => setSelectedPoi(null)}
+          onBuildRoute={handleBuildRoute}
+          onOpenPanorama={handleOpenPanorama}
+        />
       )}
 
-      {/* Полноэкранная модалка 360 Панорамы */}
-      {showPanoModal && (
-        <div className="fixed inset-0 bg-black z-50 flex flex-col">
-          <div className="absolute top-4 left-4 right-4 flex justify-between items-center z-10 pointer-events-auto">
-            <span className="bg-black/60 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full border border-white/20 flex items-center gap-2">
-              <Compass className="w-4 h-4 text-[#E30613] animate-spin" /> 360° Виртуальный тур
-            </span>
-            <button 
-              onClick={() => setShowPanoModal(false)}
-              className="bg-black/60 backdrop-blur-md text-white p-2 rounded-full border border-white/20 active:scale-95"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-          <div id="pano-container" className="w-full h-full"></div>
-        </div>
+      {/* 5. Шторка активного маршрута с пошаговой навигацией */}
+      {activeRoute && (
+        <RouteDrawer
+          route={activeRoute}
+          targetPoi={routeTargetPoi}
+          onClearRoute={handleClearRoute}
+          onStartVirtualWalk={() => setShowVirtualWalk(true)}
+        />
+      )}
+
+      {/* 6. Полноэкранный 360° Виртуальный тур (Pannellum + Гироскоп) */}
+      {showPanoModal && activePanorama && (
+        <PanoModal
+          panorama={activePanorama}
+          allPanoramas={activeFloor.panoramas}
+          onSelectPanorama={id => setActivePanoId(id)}
+          onClose={() => setShowPanoModal(false)}
+          onSelectPoiById={poiId => {
+            const found = activeFloor.points.find(p => p.id === poiId);
+            if (found) setSelectedPoi(found);
+          }}
+        />
+      )}
+
+      {/* 7. Режим «Виртуальная 360° прогулка» по цепочке панорам */}
+      {showVirtualWalk && activeRoute && (
+        <VirtualWalkModal
+          route={activeRoute}
+          allPanoramas={activeFloor.panoramas}
+          onClose={() => setShowVirtualWalk(false)}
+        />
       )}
     </div>
   );

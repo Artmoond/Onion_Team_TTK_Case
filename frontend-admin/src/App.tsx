@@ -42,21 +42,63 @@ function Studio({ session, onLogout }: StudioProps) {
       description: 'Описание созданного объекта',
       x,
       y
+import { Suspense, lazy, useEffect, useState } from 'react';
+import { FloorTabs } from './components/floors/FloorTabs';
+import { ConfirmDialog } from './components/layout/ConfirmDialog';
+import { PropertiesPanel } from './components/layout/PropertiesPanel';
+import { Sidebar } from './components/layout/Sidebar';
+import { ToastView } from './components/layout/Toast';
+import { TopBar } from './components/layout/TopBar';
+import { BackendVenuesModal } from './components/project/BackendVenuesModal';
+import { ProjectStartScreen } from './components/project/ProjectStartScreen';
+import { PublishQrModal } from './components/publish/PublishQrModal';
+import { persistCurrentDraft, useActiveFloor, useEditorStore } from './store/editorStore';
+
+const EditorCanvas = lazy(() => import('./components/editor/EditorCanvas').then((module) => ({ default: module.EditorCanvas })));
+
+export default function App() {
+  const venue = useEditorStore((state) => state.venue);
+  const activeFloor = useActiveFloor();
+  const activeFloorId = useEditorStore((state) => state.activeFloorId);
+  const settings = useEditorStore((state) => state.settings);
+  const dirty = useEditorStore((state) => state.dirty);
+  const clearProject = useEditorStore((state) => state.clearProject);
+  const [backendOpen, setBackendOpen] = useState(false);
+  const [publishOpen, setPublishOpen] = useState(false);
+  const [newProjectOpen, setNewProjectOpen] = useState(false);
+
+  useEffect(() => {
+    if (!venue) return;
+    const timer = window.setTimeout(() => {
+      persistCurrentDraft();
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [venue, activeFloorId, settings]);
+
+  useEffect(() => {
+    if (!venue) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
     };
-    setPois([...pois, newPoi]);
-    setSelectedPoi(newPoi);
-  };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [dirty, venue]);
 
-  const removePoi = (id: string) => {
-    setPois(pois.filter(p => p.id !== id));
-    if (selectedPoi?.id === id) setSelectedPoi(null);
-  };
+  if (!venue) {
+    return (
+      <>
+        <ProjectStartScreen />
+        <ToastView />
+      </>
+    );
+  }
 
-  const copyLink = () => {
-    navigator.clipboard.writeText('http://localhost:3000/m/ttk-expo');
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
+  const totalPoints = venue.floors.reduce((sum, floor) => sum + floor.points.length, 0);
+  const totalWalls = venue.floors.reduce((sum, floor) => sum + (floor.walls?.length ?? 0), 0);
+  const totalStairs = venue.floors.reduce((sum, floor) => sum + (floor.stairs?.length ?? 0), 0);
+  const totalPanoramas = venue.floors.reduce((sum, floor) => sum + floor.panoramas.length, 0);
 
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 font-sans text-slate-100">
@@ -234,63 +276,36 @@ function Studio({ session, onLogout }: StudioProps) {
             </svg>
           </div>
         </main>
+        <PropertiesPanel />
       </div>
+      <footer className="z-20 flex h-7 shrink-0 items-center gap-4 border-t border-slate-800 bg-slate-900 px-3 text-[9px] text-slate-500">
+        <span className="font-mono">schema v{venue.schemaVersion ?? 1}</span>
+        <span>{activeFloor?.name ?? '—'}</span>
+        <span className="text-slate-600">|</span>
+        <span>Точки: {totalPoints}</span>
+        <span>Стены: {totalWalls}</span>
+        <span>Лестницы: {totalStairs}</span>
+        <span>Панорамы: {totalPanoramas}</span>
+        <span className="ml-auto">Ctrl+Z / Ctrl+Shift+Z · Delete · Esc</span>
+        <span className={dirty ? 'text-amber-400' : 'text-emerald-500'}>{dirty ? 'есть несохранённые изменения' : 'черновик сохранён'}</span>
+      </footer>
 
-      {/* Модальное окно Публикации и скачивания QR-кода */}
-      {showQrModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl">
-            <h2 className="text-lg font-bold text-white mb-2">Публичная карта готова!</h2>
-            <p className="text-xs text-slate-400 mb-6">
-              Посетители могут открыть эту карту без установки мобильных приложений, просто наведя камеру телефона на QR-код.
-            </p>
+      {backendOpen && <BackendVenuesModal onClose={() => setBackendOpen(false)} />}
+      {publishOpen && <PublishQrModal onClose={() => setPublishOpen(false)} />}
 
-            {/* Имитация брендированного QR-кода ТТК */}
-            <div className="bg-white p-4 rounded-xl inline-block mb-4 shadow-lg">
-              <img 
-                src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/m/ttk-expo" 
-                alt="QR Code" 
-                className="w-48 h-48"
-              />
-              <div className="mt-2 text-slate-900 font-bold text-[11px] tracking-wider uppercase">
-                ТТК • Карта Пространства
-              </div>
-            </div>
+      <ConfirmDialog
+        open={newProjectOpen}
+        title="Создать новый проект?"
+        text="Текущая карта будет закрыта. Локальный черновик заменится новым проектом. При необходимости сначала опубликуйте карту или сохраните черновик."
+        confirmLabel="Создать новый"
+        onCancel={() => setNewProjectOpen(false)}
+        onConfirm={() => {
+          setNewProjectOpen(false);
+          clearProject();
+        }}
+      />
 
-            <div className="flex items-center gap-2 bg-slate-800 p-2.5 rounded-lg border border-slate-700 mb-4 text-xs">
-              <input 
-                readOnly 
-                value="http://localhost:3000/m/ttk-expo" 
-                className="bg-transparent flex-1 text-slate-300 outline-none"
-              />
-              <button 
-                onClick={copyLink} 
-                className="bg-[#E30613] hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded transition-all flex items-center gap-1"
-              >
-                {isCopied ? <Check className="w-3.5 h-3.5" /> : 'Копировать'}
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <a 
-                href="https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=http://localhost:3000/m/ttk-expo" 
-                download="ttk_qr_code.png"
-                target="_blank"
-                rel="noreferrer"
-                className="bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 border border-slate-700"
-              >
-                <Download className="w-4 h-4" /> Скачать QR (PNG)
-              </a>
-              <button 
-                onClick={() => setShowQrModal(false)}
-                className="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs py-2.5 px-3 rounded-lg"
-              >
-                Закрыть
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ToastView />
     </div>
   );
 }
