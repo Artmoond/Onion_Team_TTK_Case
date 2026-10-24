@@ -1,5 +1,5 @@
 export const PLAN_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
-export const PANORAMA_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'];
+export const PANORAMA_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 export const MAX_PLAN_BYTES = 12 * 1024 * 1024;
 export const MAX_PANORAMA_BYTES = 25 * 1024 * 1024;
 
@@ -16,7 +16,7 @@ export function validateFile(
 ): string | null {
   if (!file.size) return 'Файл пустой.';
   if (file.size > maxBytes) return `Файл больше ${formatBytes(maxBytes)}.`;
-  if (file.type && !mimeTypes.includes(file.type)) {
+  if (!file.type || !mimeTypes.includes(file.type)) {
     return `Неподдерживаемый формат: ${file.type}. Разрешены ${mimeTypes.join(', ')}.`;
   }
   return null;

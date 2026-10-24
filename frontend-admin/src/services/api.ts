@@ -13,18 +13,33 @@ export class ApiError extends Error {
 
 function mediaUrl(path: string): string {
   if (!path) return path;
-  if (/^https?:\/\//i.test(path) || path.startsWith('local-asset://') || path.startsWith('data:')) {
-    return path;
+  if (path.startsWith('local-asset://')) return path;
+  try {
+    const parsed = new URL(path, `${API_BASE}/`);
+    const apiOrigin = new URL(API_BASE).origin;
+    if (parsed.origin !== apiOrigin || !parsed.pathname.startsWith('/uploads/') || parsed.username || parsed.password) {
+      throw new Error('invalid upload url');
+    }
+    return parsed.toString();
+  } catch {
+    throw new ApiError('Сервер вернул недопустимый адрес загруженного файла.');
   }
-  return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), 30_000);
+  const abortFromCaller = () => controller.abort();
+  init?.signal?.addEventListener('abort', abortFromCaller, { once: true });
   try {
-    response = await fetch(`${API_BASE}${path}`, init);
-  } catch {
-    throw new ApiError(`Backend недоступен по адресу ${API_BASE}. Используйте локальный режим или запустите backend.`);
+    response = await fetch(`${API_BASE}${path}`, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new ApiError('Запрос к серверу отменён или превысил лимит времени.');
+    throw new ApiError(`Сервер недоступен по адресу ${API_BASE}. Используйте локальный режим или запустите сервер.`);
+  } finally {
+    globalThis.clearTimeout(timeout);
+    init?.signal?.removeEventListener('abort', abortFromCaller);
   }
   if (!response.ok) {
     const text = await response.text().catch(() => '');
@@ -67,12 +82,25 @@ export function buildPublicUrl(venue: Venue, override?: string): {
   url: string;
   source: 'backend' | 'manual' | 'test';
 } {
-  if (venue.publicUrl?.trim()) {
-    return { url: venue.publicUrl.trim(), source: 'backend' };
+  const validPublicUrl = (value?: string): string | null => {
+    if (!value?.trim()) return null;
+    try {
+      const parsed = new URL(value.trim());
+      if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:') || parsed.username || parsed.password) return null;
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  };
+  const backendUrl = validPublicUrl(venue.publicUrl);
+  if (backendUrl) {
+    return { url: backendUrl, source: 'backend' };
   }
-  if (override?.trim()) {
-    return { url: override.trim(), source: 'manual' };
+  const manualUrl = validPublicUrl(override);
+  if (manualUrl) {
+    return { url: manualUrl, source: 'manual' };
   }
-  const base = (import.meta.env.VITE_PUBLIC_MAP_BASE_URL || 'http://localhost:3000').replace(/\/+$/, '');
+  const configuredBase = validPublicUrl(import.meta.env.VITE_PUBLIC_MAP_BASE_URL);
+  const base = (configuredBase ?? 'http://localhost:3000').replace(/\/+$/, '');
   return { url: `${base}/m/${venue.slug}`, source: 'test' };
 }

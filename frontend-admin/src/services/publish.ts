@@ -26,8 +26,9 @@ function isLocalAsset(ref: AssetReference): boolean {
 
 function isServerRelativeUrl(url: string): boolean {
   const trimmed = url.trim();
-  if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/uploads/')) return false;
-  return !hasScheme(trimmed);
+  // Only bundled demo assets are copied during publishing. Never fetch arbitrary
+  // relative paths from a venue document.
+  return trimmed.startsWith('/demo/') && !trimmed.startsWith('//') && !hasScheme(trimmed);
 }
 
 function assetSource(ref: AssetReference): AssetSource | null {
@@ -90,6 +91,12 @@ export async function publishVenue(
       blob = await response.blob();
     } else {
       continue;
+    }
+    if (!blob.size || blob.size > 25 * 1024 * 1024) {
+      throw new Error(`Файл «${ref.fileName}» пустой или превышает лимит 25 МБ.`);
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'].includes(blob.type)) {
+      throw new Error(`Файл «${ref.fileName}» имеет неподдерживаемый тип ${blob.type || 'неизвестно'}.`);
     }
     const result = await uploadAsset(blob, `${ref.id}-${safeFileName(ref.fileName)}`);
     uploadedAssets.set(ref.id, {

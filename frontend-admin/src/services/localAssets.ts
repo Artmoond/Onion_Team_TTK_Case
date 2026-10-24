@@ -105,6 +105,44 @@ export async function readImageDimensions(file: Blob): Promise<{ width: number; 
   });
 }
 
+async function prepareImageFile(file: File): Promise<Blob> {
+  const header = new Uint8Array(await file.slice(0, 512).arrayBuffer());
+  const isPng = header.length >= 8 && [137, 80, 78, 71, 13, 10, 26, 10].every((byte, i) => header[i] === byte);
+  const isJpeg = header.length >= 3 && header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff;
+  const isWebp = header.length >= 12 && String.fromCharCode(...header.slice(0, 4)) === 'RIFF' && String.fromCharCode(...header.slice(8, 12)) === 'WEBP';
+  if (isPng && file.type === 'image/png' || isJpeg && file.type === 'image/jpeg' || isWebp && file.type === 'image/webp') return file;
+
+  if (file.type !== 'image/svg+xml') {
+    throw new Error('Содержимое файла не совпадает с форматом изображения.');
+  }
+
+  const source = await file.text();
+  if (source.length > 12 * 1024 * 1024) throw new Error('SVG слишком большой для обработки.');
+  const parsed = new DOMParser().parseFromString(source, 'image/svg+xml');
+  const root = parsed.documentElement;
+  if (parsed.querySelector('parsererror') || root.localName.toLowerCase() !== 'svg') {
+    throw new Error('Файл не является корректным SVG.');
+  }
+  root.querySelectorAll('script, foreignObject, iframe, object, embed, audio, video').forEach((node) => node.remove());
+  for (const element of [root, ...Array.from(root.querySelectorAll('*'))]) {
+    for (const attribute of Array.from(element.attributes)) {
+      const name = attribute.name.toLowerCase();
+      const value = attribute.value.trim();
+      if (name.startsWith('on')) {
+        element.removeAttribute(attribute.name);
+      } else if ((name === 'href' || name.endsWith(':href')) && value && !value.startsWith('#')) {
+        element.removeAttribute(attribute.name);
+      } else if (name === 'style' && /url\s*\(|@import|expression\s*\(/i.test(value)) {
+        element.removeAttribute(attribute.name);
+      }
+    }
+  }
+  root.querySelectorAll('style').forEach((node) => {
+    if (/url\s*\(|@import|expression\s*\(/i.test(node.textContent ?? '')) node.remove();
+  });
+  return new Blob([new XMLSerializer().serializeToString(root)], { type: 'image/svg+xml' });
+}
+
 export interface LocalAssetOptions {
   fileName?: string;
   readDimensions?: boolean;
@@ -112,11 +150,12 @@ export interface LocalAssetOptions {
 
 export async function createLocalAsset(file: File, options: LocalAssetOptions = {}): Promise<import('../types/venue').AssetReference> {
   const id = `asset-${typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Date.now()}`;
-  await putLocalAsset(id, file);
+  const safeFile = await prepareImageFile(file);
+  await putLocalAsset(id, safeFile);
   let dimensions: { width: number; height: number } | undefined;
   if (options.readDimensions !== false) {
     try {
-      dimensions = await readImageDimensions(file);
+      dimensions = await readImageDimensions(safeFile);
     } catch {
       dimensions = undefined;
     }
@@ -124,8 +163,8 @@ export async function createLocalAsset(file: File, options: LocalAssetOptions = 
   return {
     id,
     fileName: options.fileName ?? file.name,
-    mimeType: file.type || 'application/octet-stream',
-    sizeBytes: file.size,
+    mimeType: safeFile.type,
+    sizeBytes: safeFile.size,
     storage: 'local',
     url: localAssetUrl(id),
     createdAt: new Date().toISOString(),

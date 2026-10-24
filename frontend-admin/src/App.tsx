@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { EditorCanvas } from './components/editor/EditorCanvas';
+import { Suspense, lazy, useEffect, useState } from 'react';
 import { FloorTabs } from './components/floors/FloorTabs';
 import { ConfirmDialog } from './components/layout/ConfirmDialog';
 import { PropertiesPanel } from './components/layout/PropertiesPanel';
@@ -10,6 +9,8 @@ import { BackendVenuesModal } from './components/project/BackendVenuesModal';
 import { ProjectStartScreen } from './components/project/ProjectStartScreen';
 import { PublishQrModal } from './components/publish/PublishQrModal';
 import { persistCurrentDraft, useActiveFloor, useEditorStore } from './store/editorStore';
+
+const EditorCanvas = lazy(() => import('./components/editor/EditorCanvas').then((module) => ({ default: module.EditorCanvas })));
 
 export default function App() {
   const venue = useEditorStore((state) => state.venue);
@@ -66,7 +67,9 @@ export default function App() {
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="relative min-w-0 flex-1">
-          <EditorCanvas />
+          <Suspense fallback={<div className="grid h-full place-items-center text-xs text-slate-500">Загрузка редактора…</div>}>
+            <EditorCanvas />
+          </Suspense>
         </main>
         <PropertiesPanel />
       </div>
