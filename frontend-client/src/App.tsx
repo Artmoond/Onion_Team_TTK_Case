@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import 'pannellum/build/pannellum.css';
+import 'pannellum';
 import { Compass, Navigation, Eye, MapPin, Search, Layers, X, Coffee, Award, DoorOpen, Users } from 'lucide-react';
 
 interface POI {
@@ -20,9 +22,34 @@ export default function App() {
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
   const [activeRoute, setActiveRoute] = useState<RouteInfo | null>(null);
   const [showPanoModal, setShowPanoModal] = useState<boolean>(false);
-  const [activePanoUrl, setActivePanoUrl] = useState<string>('https://pannellum.org/images/alma.jpg');
+  const [activePanoUrl, setActivePanoUrl] = useState<string>('/demo-pano.webp');
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const viewerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (!showPanoModal) return;
+
+    const container = document.getElementById('pano-container');
+    const pannellum = (window as any).pannellum;
+    if (!container || !pannellum) return;
+
+    viewerRef.current = pannellum.viewer(container, {
+      type: 'equirectangular',
+      panorama: activePanoUrl,
+      autoLoad: true,
+      compass: true
+    });
+
+    return () => {
+      try {
+        viewerRef.current?.destroy();
+      } catch {
+        // viewer already destroyed
+      }
+      viewerRef.current = null;
+    };
+  }, [showPanoModal, activePanoUrl]);
 
   // Базовые точки на плане (1200x800)
   const pois: POI[] = [
@@ -67,18 +94,6 @@ export default function App() {
   const openPanorama = (url?: string) => {
     if (url) setActivePanoUrl(url);
     setShowPanoModal(true);
-    setTimeout(() => {
-      // @ts-ignore
-      if (window.pannellum) {
-        // @ts-ignore
-        window.pannellum.viewer('pano-container', {
-          type: 'equirectangular',
-          panorama: url || activePanoUrl,
-          autoLoad: true,
-          compass: true
-        });
-      }
-    }, 100);
   };
 
   const filteredPois = pois.filter(p => {
@@ -145,11 +160,11 @@ export default function App() {
             )}
 
             {/* Точки панорам (глазки 360) */}
-            <g onClick={() => openPanorama('https://pannellum.org/images/alma.jpg')} className="cursor-pointer">
+            <g onClick={() => openPanorama('/demo-pano.webp')} className="cursor-pointer">
               <circle cx="600" cy="700" r="18" fill="#0284c7" />
               <text x="600" y="705" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">360</text>
             </g>
-            <g onClick={() => openPanorama('https://pannellum.org/images/jfk.jpg')} className="cursor-pointer">
+            <g onClick={() => openPanorama('/demo-pano-2.webp')} className="cursor-pointer">
               <circle cx="600" cy="400" r="18" fill="#e30613" />
               <text x="600" y="405" textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">360</text>
             </g>
