@@ -1,6 +1,6 @@
 import React from 'react';
 import { PointCategory } from '../types';
-import { Award, Presentation, Coffee, Bath, Wifi, HelpCircle, Layers } from 'lucide-react';
+import { Award, Presentation, Coffee, Bath, Wifi, HelpCircle, Layers, DoorOpen } from 'lucide-react';
 
 interface CategoryFiltersProps {
   selectedCategory: string;
@@ -15,6 +15,7 @@ const CATEGORIES: { id: string; label: string; icon: React.ComponentType<{ class
   { id: 'food', label: 'Кофе & Еда', icon: Coffee },
   { id: 'wc', label: 'Санузлы', icon: Bath },
   { id: 'wifi', label: 'Wi-Fi', icon: Wifi },
+  { id: 'entrance', label: 'Вход', icon: DoorOpen },
   { id: 'service', label: 'Сервис', icon: HelpCircle },
 ];
 

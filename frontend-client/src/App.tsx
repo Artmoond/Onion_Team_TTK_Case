@@ -9,6 +9,7 @@ import { PoiSheet } from './components/PoiSheet';
 import { RouteDrawer } from './components/RouteDrawer';
 import { PanoModal } from './components/PanoModal';
 import { VirtualWalkModal } from './components/VirtualWalkModal';
+import { OnboardingHint } from './components/OnboardingHint';
 
 export default function App() {
   const [venue, setVenue] = useState<Venue>(mockVenue);
@@ -122,6 +123,15 @@ export default function App() {
     });
   }, [activeFloor, selectedCategory, searchQuery]);
 
+  // Автозум к зоне при поиске: если нашли 1 уникальный результат — автоматически выбираем
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    if (filteredPois.length === 1) {
+      // Единственный результат — выбираем его автоматически (InteractiveMap сам зумирует)
+      setSelectedPoi(filteredPois[0]);
+    }
+  }, [searchQuery, filteredPois.length]);
+
   // Построение маршрута
   const handleBuildRoute = async (target: POI) => {
     setSelectedPoi(null);
@@ -201,6 +211,11 @@ export default function App() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         isBackendConnected={isBackendConnected}
+        searchResults={filteredPois}
+        onSelectSearchResult={poi => {
+          setSelectedPoi(poi);
+          setSearchQuery('');
+        }}
       />
 
       {/* 2. Быстрые горизонтальные фильтры категорий (сворачиваются при зуме в помещение) */}
@@ -217,19 +232,23 @@ export default function App() {
       </div>
 
       {/* 3. Интерактивная 2D Карта с плавным Pan & Zoom */}
-      <InteractiveMap
-        floor={activeFloor}
-        pois={filteredPois}
-        selectedPoi={selectedPoi}
-        onSelectPoi={poi => {
-          setSelectedPoi(poi);
-        }}
-        onClearSelectedPoi={() => setSelectedPoi(null)}
-        activeRoute={activeRoute}
-        onOpenPanorama={handleOpenPanorama}
-        activeZoneId={activeZoneId}
-        onZoneChange={setActiveZoneId}
-      />
+      <div className="relative flex-1 w-full overflow-hidden">
+        <InteractiveMap
+          floor={activeFloor}
+          pois={filteredPois}
+          selectedPoi={selectedPoi}
+          onSelectPoi={poi => {
+            setSelectedPoi(poi);
+          }}
+          onClearSelectedPoi={() => setSelectedPoi(null)}
+          activeRoute={activeRoute}
+          onOpenPanorama={handleOpenPanorama}
+          activeZoneId={activeZoneId}
+          onZoneChange={setActiveZoneId}
+        />
+        {/* Онбординг-подсказка при первом открытии */}
+        <OnboardingHint activeZoneId={activeZoneId} />
+      </div>
 
       {/* 4. Шторка информации о выбранной точке (Bottom Sheet) */}
       {selectedPoi && !activeRoute && (

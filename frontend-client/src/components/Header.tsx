@@ -1,6 +1,6 @@
-import React from 'react';
-import { Search, Layers, X, Sparkles, Wifi } from 'lucide-react';
-import { Floor } from '../types';
+import React, { useRef, useEffect } from 'react';
+import { Search, Layers, X, Sparkles } from 'lucide-react';
+import { Floor, POI } from '../types';
 
 interface HeaderProps {
   floors: Floor[];
@@ -9,6 +9,9 @@ interface HeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   isBackendConnected: boolean;
+  // Новые пропсы для живого поиска
+  searchResults?: POI[];
+  onSelectSearchResult?: (poi: POI) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,8 +20,24 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectFloor,
   searchQuery,
   onSearchChange,
-  isBackendConnected,
+  searchResults = [],
+  onSelectSearchResult,
 }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Скрываем дропдаун при клике вне хедера
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('#header-search-wrapper')) {
+        // не убираем query — пусть пользователь сам очищает
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const showDropdown = searchQuery.trim().length > 0 && searchResults.length > 0;
+
   return (
     <header className="flex flex-col bg-slate-900/95 backdrop-blur-md border-b border-slate-800 z-30 shadow-lg">
       {/* Верхняя строка с логотипом ТТК и селектором этажа */}
@@ -55,14 +74,26 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Поисковая строка */}
-      <div className="px-3 pb-2.5 pt-0.5">
+      {/* Поисковая строка с live-дропдауном */}
+      <div className="px-3 pb-2.5 pt-0.5 relative" id="header-search-wrapper">
         <div className="relative flex items-center">
           <Search className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
           <input
+            ref={inputRef}
             type="text"
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && searchResults.length > 0 && onSelectSearchResult) {
+                onSelectSearchResult(searchResults[0]);
+                onSearchChange('');
+                inputRef.current?.blur();
+              }
+              if (e.key === 'Escape') {
+                onSearchChange('');
+                inputRef.current?.blur();
+              }
+            }}
             placeholder="Поиск стендов, залов, кофе, WC..."
             className="w-full bg-slate-800/90 text-sm text-white placeholder-slate-400 pl-9 pr-9 py-2 rounded-xl border border-slate-700/60 focus:outline-none focus:border-[#E30613] focus:ring-1 focus:ring-[#E30613] transition-all"
           />
@@ -75,6 +106,31 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
         </div>
+
+        {/* Live дропдаун результатов поиска */}
+        {showDropdown && (
+          <div className="absolute left-3 right-3 top-full mt-1 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-50 max-h-52 overflow-y-auto">
+            {searchResults.slice(0, 6).map(poi => (
+              <button
+                key={poi.id}
+                onClick={() => {
+                  if (onSelectSearchResult) onSelectSearchResult(poi);
+                  onSearchChange('');
+                }}
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-800 text-left transition-colors border-b border-slate-800/60 last:border-0"
+              >
+                <div className="w-2 h-2 rounded-full shrink-0 bg-[#E30613]" />
+                <div>
+                  <div className="text-sm text-white font-medium">{poi.name}</div>
+                  {poi.description && (
+                    <div className="text-xs text-slate-400 truncate max-w-[200px]">{poi.description}</div>
+                  )}
+                </div>
+                <span className="ml-auto text-xs text-slate-500 shrink-0">→ перейти</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </header>
   );
