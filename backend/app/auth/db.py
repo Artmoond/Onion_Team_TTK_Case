@@ -20,6 +20,7 @@ _initialized = False
 
 
 def _connect() -> sqlite3.Connection:
+    config.AUTH_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(config.AUTH_DB_PATH), timeout=15)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
@@ -88,7 +89,10 @@ def init_db() -> None:
         config.AUTH_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         with db() as conn:
             conn.executescript(SCHEMA)
-            conn.execute("PRAGMA journal_mode = WAL")
+            try:
+                conn.execute("PRAGMA journal_mode = WAL")
+            except Exception:
+                conn.execute("PRAGMA journal_mode = DELETE")
         _seed_demo_users()
         try:
             # База не должна читаться другими пользователями хоста.

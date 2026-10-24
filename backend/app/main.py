@@ -98,6 +98,7 @@ def cleanup_auth_tokens_on_startup() -> None:
 
 UPLOAD_DIR = Path(os.getenv("TTK_UPLOAD_DIR", "/app/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+PUBLIC_MAP_BASE_URL = (os.getenv("PUBLIC_MAP_BASE_URL") or "http://localhost:3000").rstrip("/")
 
 PANORAMA_INDEX = UPLOAD_DIR / "panoramas" / "index.json"
 FOLDER_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -222,6 +223,10 @@ def get_venue(slug: str, _admin=Depends(require_admin)):
 
 @app.put("/api/venues/{slug}")
 def save_venue(slug: str, updated_venue: Dict[str, Any], _admin=Depends(require_admin)):
+    if updated_venue.get("slug") != slug:
+        raise HTTPException(status_code=400, detail="Slug в URL и JSON не совпадает")
+    public_url = f"{PUBLIC_MAP_BASE_URL}/m/{slug}"
+    updated_venue["publicUrl"] = public_url
     local_venues_db[slug] = updated_venue
     try:
         venues_dir = UPLOAD_DIR / "venues"
@@ -234,7 +239,7 @@ def save_venue(slug: str, updated_venue: Dict[str, Any], _admin=Depends(require_
         tmp_dest.replace(dest)
     except Exception as e:
         print(f"Warning: could not persist venue to disk: {e}")
-    return {"status": "saved", "slug": slug}
+    return {"status": "saved", "slug": slug, "publicUrl": public_url}
 
 
 def _safe_upload_name(filename: str) -> str:

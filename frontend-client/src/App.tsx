@@ -12,7 +12,21 @@ import { VirtualWalkModal } from './components/VirtualWalkModal';
 import AuthScreen from './components/AuthScreen';
 import { API_URL, clearSession, logoutSession, restoreSession, type Session } from './lib/auth';
 
+function getPublicSlug(): string | null {
+  const match = window.location.pathname.match(/^\/m\/([^/]+)\/?$/);
+  if (match) {
+    try {
+      return decodeURIComponent(match[1]);
+    } catch {
+      return match[1];
+    }
+  }
+  const params = new URLSearchParams(window.location.search);
+  return params.get('venue') || null;
+}
+
 export default function App() {
+  const publicSlug = getPublicSlug();
   const [session, setSession] = useState<Session | null>(null);
   const [booting, setBooting] = useState<boolean>(true);
 
@@ -31,6 +45,8 @@ export default function App() {
   const [showVirtualWalk, setShowVirtualWalk] = useState<boolean>(false);
 
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
+  const [isVenueLoading, setIsVenueLoading] = useState<boolean>(Boolean(publicSlug));
+  const [publicLoadError, setPublicLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -65,6 +81,22 @@ export default function App() {
   // Проверка связи с бэкендом при старте
   useEffect(() => {
     const checkBackend = async () => {
+      if (publicSlug) {
+        try {
+          const venueRes = await fetch(`${API_URL}/api/public/${encodeURIComponent(publicSlug)}`);
+          if (!venueRes.ok) throw new Error(venueRes.status === 404 ? 'Карта по этой ссылке не найдена.' : `Ошибка загрузки карты (${venueRes.status}).`);
+          const data: Venue = await venueRes.json();
+          if (!data?.floors?.length) throw new Error('Backend вернул карту без этажей.');
+          setVenue(data);
+          setActiveFloorId(data.floors[0].id);
+          setIsBackendConnected(true);
+        } catch (error) {
+          setPublicLoadError(error instanceof Error ? error.message : 'Не удалось загрузить карту.');
+        } finally {
+          setIsVenueLoading(false);
+        }
+        return;
+      }
       try {
         const res = await fetch(`${API_URL}/api/health`, { method: 'GET' });
         if (res.ok) {
@@ -75,6 +107,7 @@ export default function App() {
             const data = await venueRes.json();
             if (data && data.floors && data.floors.length > 0) {
               setVenue(data);
+              setActiveFloorId(data.floors[0].id);
             }
           }
         }
@@ -84,7 +117,7 @@ export default function App() {
       }
     };
     checkBackend();
-  }, []);
+  }, [publicSlug]);
 
   // Поддержка query-параметров (?poi=poi-ttk-stand)
   useEffect(() => {
@@ -170,7 +203,7 @@ export default function App() {
     // 1. Попытка запроса к бэкенду
     if (isBackendConnected) {
       try {
-        const res = await fetch(`${API_URL}/api/public/ttk-expo/route`, {
+        const res = await fetch(`${API_URL}/api/public/${encodeURIComponent(venue.slug || 'ttk-expo')}/route`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -242,10 +275,22 @@ export default function App() {
     );
   }
 
+  if (isVenueLoading || publicLoadError) {
+    return (
+      <div className="grid h-screen w-screen place-items-center bg-slate-950 px-6 text-center font-sans text-slate-200">
+        <div>
+          <p className="text-lg font-bold">{isVenueLoading ? 'Загружаем карту…' : 'Карта недоступна'}</p>
+          {publicLoadError && <p className="mt-2 text-sm text-slate-400">{publicLoadError}</p>}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen w-screen bg-slate-950 font-sans text-slate-100 overflow-hidden relative">
       {/* 1. Верхний адаптивный хедер с поиском, этажами и профилем */}
       <Header
+        venueTitle={venue.title}
         floors={venue.floors}
         activeFloorId={activeFloorId}
         onSelectFloor={id => {

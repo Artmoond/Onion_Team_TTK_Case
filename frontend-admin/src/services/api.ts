@@ -66,7 +66,7 @@ export async function fetchVenue(slug: string): Promise<Venue> {
   return request(`/api/public/${encodeURIComponent(slug)}`);
 }
 
-export async function saveVenue(venue: Venue): Promise<{ status: string; slug: string }> {
+export async function saveVenue(venue: Venue): Promise<{ status: string; slug: string; publicUrl?: string }> {
   return request(`/api/venues/${encodeURIComponent(venue.slug)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -84,10 +84,7 @@ export async function uploadAsset(file: Blob, fileName: string): Promise<{ url: 
   return { ...result, url: mediaUrl(result.url) };
 }
 
-export function buildPublicUrl(venue: Venue, override?: string): {
-  url: string;
-  source: 'backend' | 'manual' | 'test';
-} {
+export function buildPublicUrl(venue: Venue): { url: string; source: 'backend' } | null {
   const validPublicUrl = (value?: string): string | null => {
     if (!value?.trim()) return null;
     try {
@@ -102,11 +99,5 @@ export function buildPublicUrl(venue: Venue, override?: string): {
   if (backendUrl) {
     return { url: backendUrl, source: 'backend' };
   }
-  const manualUrl = validPublicUrl(override);
-  if (manualUrl) {
-    return { url: manualUrl, source: 'manual' };
-  }
-  const configuredBase = validPublicUrl(import.meta.env.VITE_PUBLIC_MAP_BASE_URL);
-  const base = (configuredBase ?? 'http://localhost:3000').replace(/\/+$/, '');
-  return { url: `${base}/m/${venue.slug}`, source: 'test' };
+  return null;
 }

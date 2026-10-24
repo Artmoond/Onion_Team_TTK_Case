@@ -4,6 +4,7 @@ import { Floor, POI } from '../types';
 import type { Session } from '../lib/auth';
 
 interface HeaderProps {
+  venueTitle: string;
   floors: Floor[];
   activeFloorId: string;
   onSelectFloor: (floorId: string) => void;
@@ -18,6 +19,7 @@ interface HeaderProps {
 }
 
 export const Header: React.FC<HeaderProps> = ({
+  venueTitle,
   floors,
   activeFloorId,
   onSelectFloor,
@@ -53,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
             <span>ТТК</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <span className="font-extrabold text-sm tracking-tight text-white">Карта Пространства</span>
+            <span className="max-w-[40vw] sm:max-w-xs truncate font-extrabold text-sm tracking-tight text-white">{venueTitle || 'Карта Пространства'}</span>
             <span className="text-[10px] bg-red-950/70 border border-red-500/30 text-red-400 px-1.5 py-0.2 rounded font-semibold flex items-center gap-0.5">
               <Sparkles className="w-2.5 h-2.5" /> 2026
             </span>

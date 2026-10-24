@@ -205,12 +205,11 @@ function reconcileSelection(
 }
 
 function initialDraft() {
-  const draft = loadDraft();
   return {
-    venue: draft?.venue ?? null,
-    activeFloorId: draft?.activeFloorId ?? null,
-    settings: draft?.settings ?? DEFAULT_SETTINGS,
-    lastSavedAt: draft?.savedAt ?? null,
+    venue: null,
+    activeFloorId: null,
+    settings: DEFAULT_SETTINGS,
+    lastSavedAt: null,
     dirty: false,
   };
 }

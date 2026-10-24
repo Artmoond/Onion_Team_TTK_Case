@@ -1,4 +1,4 @@
-import { Check, Copy, Download, ExternalLink, Loader2, QrCode, Server, UploadCloud, Wifi, WifiOff } from 'lucide-react';
+import { Check, Copy, Download, ExternalLink, Loader2, QrCode, Server, UploadCloud, Wifi } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { buildPublicUrl } from '../../services/api';
@@ -14,8 +14,6 @@ interface PublishQrModalProps {
 
 export function PublishQrModal({ onClose }: PublishQrModalProps) {
   const venue = useEditorStore((state) => state.venue);
-  const settings = useEditorStore((state) => state.settings);
-  const setSettings = useEditorStore((state) => state.setSettings);
   const setVenueAfterSync = useEditorStore((state) => state.setVenueAfterSync);
   const showToast = useEditorStore((state) => state.showToast);
   const markSaving = useEditorStore((state) => state.markSaving);
@@ -30,10 +28,12 @@ export function PublishQrModal({ onClose }: PublishQrModalProps) {
 
   if (!venue) return null;
 
-  const publicLink = buildPublicUrl(venue, settings.publicUrlOverride);
+  const publicLink = buildPublicUrl(venue);
+  const published = Boolean(venue.publicUrl);
   const assetsToUpload = countAssetsToUpload(venue);
 
   const copy = async () => {
+    if (!publicLink) return;
     try {
       await navigator.clipboard.writeText(publicLink.url);
       setCopied(true);
@@ -104,16 +104,22 @@ export function PublishQrModal({ onClose }: PublishQrModalProps) {
       <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
         <div className="flex flex-col items-center">
           <div ref={qrWrapRef} className="rounded-2xl bg-white p-4 shadow-xl">
-            <QRCodeCanvas value={publicLink.url} size={220} level="M" includeMargin />
+            {publicLink ? (
+              <QRCodeCanvas value={publicLink.url} size={220} level="M" includeMargin />
+            ) : (
+              <div className="flex h-[252px] w-[252px] items-center justify-center text-center text-xs text-slate-500">
+                QR появится после публикации
+              </div>
+            )}
             <div className="mt-2 text-center text-[10px] font-bold uppercase tracking-wider text-slate-800">
               ТТК · Карта пространства
             </div>
           </div>
           <div className="mt-3 flex w-full gap-2">
-            <button className="btn flex-1" onClick={downloadQr}>
+            <button className="btn flex-1" onClick={downloadQr} disabled={!published}>
               <Download className="h-4 w-4" /> PNG
             </button>
-            <button className="btn flex-1" onClick={copy}>
+            <button className="btn flex-1" onClick={copy} disabled={!published}>
               {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
               {copied ? 'Скопировано' : 'Копировать'}
             </button>
@@ -122,47 +128,31 @@ export function PublishQrModal({ onClose }: PublishQrModalProps) {
             <div className="flex items-center gap-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-500">
               <QrCode className="h-3.5 w-3.5" /> QR ведёт на
             </div>
-            <a href={publicLink.url} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 break-all font-mono text-[10px] text-cyan-300 hover:underline">
-              {publicLink.url} <ExternalLink className="h-3 w-3 shrink-0" />
-            </a>
+            {publicLink ? (
+              <a href={publicLink.url} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1 break-all font-mono text-[10px] text-cyan-300 hover:underline">
+                {publicLink.url} <ExternalLink className="h-3 w-3 shrink-0" />
+              </a>
+            ) : (
+              <div className="mt-1 font-mono text-[10px] text-slate-500">Ссылка появится после успешной публикации</div>
+            )}
           </div>
         </div>
 
         <div className="space-y-4">
-          <div
-            className={`rounded-xl border p-3 ${
-              publicLink.source === 'test'
-                ? 'border-amber-700/60 bg-amber-950/25'
-                : 'border-emerald-800/60 bg-emerald-950/20'
-            }`}
-          >
-            <div className={`flex items-center gap-2 text-xs font-bold ${publicLink.source === 'test' ? 'text-amber-300' : 'text-emerald-300'}`}>
-              {publicLink.source === 'test' ? <WifiOff className="h-4 w-4" /> : <Wifi className="h-4 w-4" />}
-              {publicLink.source === 'test'
-                ? 'Тестовая конфигурация публичного URL'
-                : publicLink.source === 'backend'
-                  ? 'URL получен из данных площадки'
-                  : 'URL задан вручную'}
+          {!published ? (
+            <div className="rounded-xl border border-amber-700/60 bg-amber-950/25 p-3 text-xs text-amber-300">
+              Ссылка и QR-код будут созданы после успешного сохранения карты на backend.
             </div>
-            <p className="mt-1 text-[10px] leading-relaxed text-slate-400">
-              {publicLink.source === 'test'
-                ? 'Backend пока не возвращает публичную ссылку площадки. Адрес сформирован из VITE_PUBLIC_MAP_BASE_URL и slug. Это явно тестовый адрес, а не выдуманный production URL.'
-                : 'Проверьте, что этот адрес действительно обслуживается клиентским приложением площадки.'}
-            </p>
-          </div>
-
-          <div>
-            <label className="label">Публичный URL (переопределение тестового адреса)</label>
-            <input
-              className="field font-mono"
-              value={settings.publicUrlOverride}
-              onChange={(event) => setSettings({ publicUrlOverride: event.target.value })}
-              placeholder={`http://localhost:3000/m/${venue.slug}`}
-            />
-            <p className="mt-1 text-[9px] text-slate-500">
-              Оставьте пустым, чтобы использовать URL из данных площадки или тестовый адрес. Никакие запросы на несуществующие endpoint не выполняются.
-            </p>
-          </div>
+          ) : (
+            <div className="rounded-xl border border-emerald-800/60 bg-emerald-950/20 p-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-emerald-300">
+                <Wifi className="h-4 w-4" /> URL выдан backend; QR-код создаётся локально
+              </div>
+              <p className="mt-1 text-[10px] leading-relaxed text-slate-400">
+                Проверьте, что клиентское приложение доступно по этому адресу.
+              </p>
+            </div>
+          )}
 
           <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -204,7 +194,7 @@ export function PublishQrModal({ onClose }: PublishQrModalProps) {
           )}
 
           <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-2.5 text-[10px] text-slate-500">
-            Backend хранит площадки in-memory: после перезапуска контейнера данные нужно опубликовать повторно. Загруженные файлы остаются в ./data/uploads.
+            Backend сохраняет площадки на диск (в ./data/uploads/venues/{venue.slug}.json).
           </div>
         </div>
       </div>

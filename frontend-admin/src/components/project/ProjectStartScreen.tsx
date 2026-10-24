@@ -1,6 +1,6 @@
-import { FolderOpen, Map, Plus, Sparkles } from 'lucide-react';
+import { FolderOpen, Map, Plus, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
-import { demoVenue } from '../../data/demoVenue';
+import { loadDraft } from '../../services/storage';
 import { useEditorStore } from '../../store/editorStore';
 import { slugify } from '../../utils/id';
 import { isValidSlug } from '../../utils/validation';
@@ -14,11 +14,12 @@ export function ProjectStartScreen(_props: ProjectStartScreenProps) {
   const createProject = useEditorStore((state) => state.createProject);
   const loadProject = useEditorStore((state) => state.loadProject);
   const showToast = useEditorStore((state) => state.showToast);
-  const [title, setTitle] = useState('Экспоцентр ТТК 2026');
-  const [slug, setSlug] = useState('ttk-expo-2026');
+  const [title, setTitle] = useState('');
+  const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
-  const [description, setDescription] = useState('Интерактивная карта павильона для посетителей мероприятия.');
+  const [description, setDescription] = useState('');
   const [backendOpen, setBackendOpen] = useState(false);
+  const [savedDraft] = useState(loadDraft);
 
   const handleTitle = (value: string) => {
     setTitle(value);
@@ -80,7 +81,7 @@ export function ProjectStartScreen(_props: ProjectStartScreenProps) {
           <div className="space-y-4">
             <div>
               <label className="label">Название площадки</label>
-              <input className="field" value={title} onChange={(event) => handleTitle(event.target.value)} />
+              <input className="field" value={title} onChange={(event) => handleTitle(event.target.value)} placeholder="Например, Форум 2026" />
             </div>
             <div>
               <label className="label">Slug для публичной ссылки</label>
@@ -92,7 +93,7 @@ export function ProjectStartScreen(_props: ProjectStartScreenProps) {
                   setSlug(slugify(event.target.value));
                 }}
               />
-              <p className="mt-1 text-[10px] text-slate-500">Используется в адресе /m/{slug || 'slug'}</p>
+              <p className="mt-1 text-[10px] text-slate-500">Публичный адрес будет создан backend после публикации.</p>
             </div>
             <div>
               <label className="label">Описание</label>
@@ -100,6 +101,7 @@ export function ProjectStartScreen(_props: ProjectStartScreenProps) {
                 className="field min-h-20 resize-none"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
+                placeholder="Описание площадки (необязательно)"
               />
             </div>
             <button className="btn-primary w-full py-2.5" onClick={create}>
@@ -107,17 +109,15 @@ export function ProjectStartScreen(_props: ProjectStartScreenProps) {
             </button>
           </div>
 
-          <div className="my-5 flex items-center gap-3 text-[10px] font-bold uppercase tracking-wider text-slate-600">
-            <span className="h-px flex-1 bg-slate-800" /> или <span className="h-px flex-1 bg-slate-800" />
-          </div>
-
-          <div className="grid gap-2">
-            <button className="btn" onClick={() => loadProject(structuredClone(demoVenue))}>
-              <Sparkles className="h-4 w-4 text-amber-400" /> Открыть демо-карту
-            </button>
+          <div className="mt-6 border-t border-slate-800/80 pt-4 grid gap-2">
             <button className="btn" onClick={() => setBackendOpen(true)}>
               <FolderOpen className="h-4 w-4 text-cyan-400" /> Открыть карту с сервера
             </button>
+            {savedDraft && (
+              <button className="btn" onClick={() => loadProject(savedDraft.venue)}>
+                <RotateCcw className="h-4 w-4 text-amber-400" /> Восстановить локальный черновик
+              </button>
+            )}
           </div>
           <p className="mt-4 flex items-center gap-1.5 text-[10px] text-slate-500">
             <Map className="h-3.5 w-3.5" /> План можно загрузить после создания проекта.
