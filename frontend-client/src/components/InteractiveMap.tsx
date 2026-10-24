@@ -5,7 +5,6 @@ import {
   ZoomOut,
   Maximize2,
   Camera,
-  Navigation,
   Award,
   Presentation,
   Coffee,
@@ -13,7 +12,7 @@ import {
   Wifi,
   DoorOpen,
   ArrowLeft,
-  Sparkles
+  Footprints
 } from 'lucide-react';
 
 interface InteractiveMapProps {
@@ -23,6 +22,8 @@ interface InteractiveMapProps {
   onSelectPoi: (poi: POI) => void;
   activeRoute: RouteResponse | null;
   onOpenPanorama: (panoId: string) => void;
+  activeZoneId: string | null;
+  onZoneChange: (zoneId: string | null) => void;
 }
 
 interface MapZone {
@@ -52,6 +53,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onSelectPoi,
   activeRoute,
   onOpenPanorama,
+  activeZoneId,
+  onZoneChange,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -66,15 +69,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const panStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const translateStartRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Активная приближенная зона (зал/прямоугольник)
-  const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
+  // Состояния наведения
   const [hoveredZoneId, setHoveredZoneId] = useState<string | null>(null);
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
 
   // Мультитач для pinch-to-zoom
   const touchDistRef = useRef<number | null>(null);
 
-  // Конфигурация кликабельных зон/прямоугольников для этажей
+  // Конфигурация кликабельных зон/прямоугольников
   const zones: MapZone[] = useMemo(() => {
     if (floor.level === 1) {
       return [
@@ -83,13 +85,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           name: 'Конференц-зал «Сириус»',
           floorLevel: 1,
           shape: 'rect',
-          x: 100,
-          y: 100,
-          width: 340,
-          height: 400,
-          centerX: 270,
-          centerY: 300,
-          zoomScale: 2.1,
+          x: 50,
+          y: 50,
+          width: 380,
+          height: 430,
+          centerX: 240,
+          centerY: 265,
+          zoomScale: 2.15,
           poiIds: ['poi-main-hall'],
           panoIds: ['pano-hall'],
           color: '#6366f1',
@@ -99,13 +101,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           name: 'Кофе-брейк & Lounge',
           floorLevel: 1,
           shape: 'rect',
-          x: 780,
-          y: 100,
-          width: 320,
-          height: 400,
-          centerX: 940,
-          centerY: 300,
-          zoomScale: 2.1,
+          x: 770,
+          y: 50,
+          width: 380,
+          height: 430,
+          centerX: 960,
+          centerY: 265,
+          zoomScale: 2.15,
           poiIds: ['poi-food'],
           panoIds: ['pano-food'],
           color: '#f59e0b',
@@ -116,27 +118,42 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           floorLevel: 1,
           shape: 'circle',
           cx: 600,
-          cy: 400,
-          r: 105,
+          cy: 360,
+          r: 115,
           centerX: 600,
-          centerY: 400,
+          centerY: 360,
           zoomScale: 2.3,
           poiIds: ['poi-ttk-stand'],
           panoIds: ['pano-ttk'],
           color: '#E30613',
         },
         {
+          id: 'zone-wifi-1',
+          name: 'Зона Wi-Fi 6 ТТК',
+          floorLevel: 1,
+          shape: 'circle',
+          cx: 600,
+          cy: 540,
+          r: 45,
+          centerX: 600,
+          centerY: 540,
+          zoomScale: 2.6,
+          poiIds: ['poi-wifi-1'],
+          panoIds: [],
+          color: '#3b82f6',
+        },
+        {
           id: 'zone-entrance',
           name: 'Входная группа & Регистрация',
           floorLevel: 1,
           shape: 'rect',
-          x: 420,
-          y: 670,
-          width: 360,
-          height: 80,
+          x: 430,
+          y: 650,
+          width: 340,
+          height: 95,
           centerX: 600,
-          centerY: 710,
-          zoomScale: 2.2,
+          centerY: 697,
+          zoomScale: 2.3,
           poiIds: ['poi-entrance'],
           panoIds: ['pano-entrance'],
           color: '#10b981',
@@ -146,12 +163,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           name: 'Лестница на 2 этаж',
           floorLevel: 1,
           shape: 'rect',
-          x: 180,
+          x: 60,
           y: 600,
-          width: 220,
-          height: 90,
-          centerX: 290,
-          centerY: 645,
+          width: 340,
+          height: 145,
+          centerX: 230,
+          centerY: 672,
           zoomScale: 2.4,
           poiIds: ['poi-stairs-1'],
           panoIds: [],
@@ -162,31 +179,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           name: 'Санузлы WC',
           floorLevel: 1,
           shape: 'rect',
-          x: 940,
-          y: 640,
-          width: 160,
-          height: 90,
-          centerX: 1020,
-          centerY: 685,
-          zoomScale: 2.5,
+          x: 800,
+          y: 600,
+          width: 340,
+          height: 145,
+          centerX: 970,
+          centerY: 672,
+          zoomScale: 2.4,
           poiIds: ['poi-wc-1'],
           panoIds: [],
           color: '#06b6d4',
-        },
-        {
-          id: 'zone-wifi-1',
-          name: 'Зона Wi-Fi 6 ТТК',
-          floorLevel: 1,
-          shape: 'circle',
-          cx: 600,
-          cy: 570,
-          r: 45,
-          centerX: 600,
-          centerY: 570,
-          zoomScale: 2.6,
-          poiIds: ['poi-wifi-1'],
-          panoIds: [],
-          color: '#3b82f6',
         },
       ];
     } else {
@@ -196,12 +198,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           name: 'VIP Lounge ТТК',
           floorLevel: 2,
           shape: 'rect',
-          x: 420,
-          y: 140,
-          width: 360,
-          height: 340,
+          x: 430,
+          y: 90,
+          width: 340,
+          height: 420,
           centerX: 600,
-          centerY: 310,
+          centerY: 300,
           zoomScale: 2.2,
           poiIds: ['poi-vip-lounge'],
           panoIds: [],
@@ -212,13 +214,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           name: 'Переговорная «Байкал»',
           floorLevel: 2,
           shape: 'rect',
-          x: 120,
-          y: 180,
-          width: 260,
-          height: 280,
-          centerX: 250,
-          centerY: 320,
-          zoomScale: 2.3,
+          x: 60,
+          y: 110,
+          width: 340,
+          height: 400,
+          centerX: 230,
+          centerY: 310,
+          zoomScale: 2.25,
           poiIds: ['poi-room-a'],
           panoIds: [],
           color: '#6366f1',
@@ -228,13 +230,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           name: 'Переговорная «Енисей»',
           floorLevel: 2,
           shape: 'rect',
-          x: 820,
-          y: 180,
-          width: 260,
-          height: 280,
-          centerX: 950,
-          centerY: 320,
-          zoomScale: 2.3,
+          x: 800,
+          y: 110,
+          width: 340,
+          height: 400,
+          centerX: 970,
+          centerY: 310,
+          zoomScale: 2.25,
           poiIds: ['poi-room-b'],
           panoIds: [],
           color: '#6366f1',
@@ -244,12 +246,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           name: 'Спуск на 1 этаж',
           floorLevel: 2,
           shape: 'rect',
-          x: 180,
+          x: 60,
           y: 600,
-          width: 220,
-          height: 90,
-          centerX: 290,
-          centerY: 645,
+          width: 340,
+          height: 145,
+          centerX: 230,
+          centerY: 672,
           zoomScale: 2.4,
           poiIds: ['poi-stairs-2'],
           panoIds: [],
@@ -259,22 +261,28 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
   }, [floor.level]);
 
-  // Сброс масштаба в центр (возврат к 100% и общему виду)
+  // Сброс масштаба в центр (возврат к общему плану 100%)
   const handleResetView = useCallback(() => {
     setScale(BASE_SCALE);
     setTranslate({ x: 0, y: 0 });
-    setActiveZoneId(null);
-  }, []);
+    onZoneChange(null);
+  }, [onZoneChange]);
 
-  // Зум к конкретной зоне/прямоугольнику
+  // Зум к конкретной зоне
   const handleZoomToZone = (zone: MapZone) => {
-    setActiveZoneId(zone.id);
+    onZoneChange(zone.id);
     const targetScale = zone.zoomScale;
-    // Смещение центра зоны к центру экрана (600, 400)
     const offsetX = (600 - zone.centerX) * (targetScale * 0.85);
     const offsetY = (400 - zone.centerY) * (targetScale * 0.85);
+
+    // Ограничение смещения, чтобы не улететь
+    const maxBoundX = (targetScale - 1) * 450;
+    const maxBoundY = (targetScale - 1) * 350;
+    const clampedX = Math.max(-maxBoundX, Math.min(maxBoundX, offsetX));
+    const clampedY = Math.max(-maxBoundY, Math.min(maxBoundY, offsetY));
+
     setScale(targetScale);
-    setTranslate({ x: offsetX, y: offsetY });
+    setTranslate({ x: clampedX, y: clampedY });
   };
 
   // Зум кнопками
@@ -282,21 +290,24 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     setScale(prev => {
       const next = Math.min(MAX_SCALE, Math.max(BASE_SCALE, Number((prev + delta).toFixed(2))));
       if (next <= BASE_SCALE) {
-        setActiveZoneId(null);
+        setTranslate({ x: 0, y: 0 });
+        onZoneChange(null);
       }
       return next;
     });
   };
 
-  // Колесо мыши
+  // Колесо мыши (зум с ограничением)
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 0.15 : -0.15;
     handleZoom(zoomFactor);
   };
 
-  // Перетаскивание карты
+  // Перетаскивание карты: ЗАПРЕЩЕНО при 100% зуме!
   const handlePointerDown = (e: React.PointerEvent) => {
+    // При 100% зуме интерфейс заблокирован и двигать его нельзя!
+    if (scale <= BASE_SCALE) return;
     if ((e.target as HTMLElement).closest('.interactive-pin')) return;
 
     setIsPanning(true);
@@ -306,13 +317,20 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isPanning) return;
+    if (!isPanning || scale <= BASE_SCALE) return;
+
     const dx = e.clientX - panStartRef.current.x;
     const dy = e.clientY - panStartRef.current.y;
-    setTranslate({
-      x: translateStartRef.current.x + dx,
-      y: translateStartRef.current.y + dy,
-    });
+    const newX = translateStartRef.current.x + dx;
+    const newY = translateStartRef.current.y + dy;
+
+    // Границы, чтобы не улететь за рамки здания
+    const maxBoundX = (scale - 1) * 480;
+    const maxBoundY = (scale - 1) * 380;
+    const clampedX = Math.max(-maxBoundX, Math.min(maxBoundX, newX));
+    const clampedY = Math.max(-maxBoundY, Math.min(maxBoundY, newY));
+
+    setTranslate({ x: clampedX, y: clampedY });
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -326,7 +344,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
   };
 
-  // Мобильный тач pinch-to-zoom
+  // Мультитач для pinch-to-zoom
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const dist = Math.hypot(
@@ -346,7 +364,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       const diff = newDist - touchDistRef.current;
       if (Math.abs(diff) > 2) {
         const factor = diff > 0 ? 0.03 : -0.03;
-        setScale(prev => Math.min(MAX_SCALE, Math.max(BASE_SCALE, prev + factor)));
+        setScale(prev => {
+          const next = Math.min(MAX_SCALE, Math.max(BASE_SCALE, prev + factor));
+          if (next <= BASE_SCALE) {
+            setTranslate({ x: 0, y: 0 });
+            onZoneChange(null);
+          }
+          return next;
+        });
         touchDistRef.current = newDist;
       }
     }
@@ -356,46 +381,46 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     touchDistRef.current = null;
   };
 
-  // Автоматический зум к зоне при выборе POI (например из поиска)
+  // Автоматический зум к зоне при выборе POI из поиска
   useEffect(() => {
     if (!selectedPoi) return;
     const parentZone = zones.find(z => z.poiIds.includes(selectedPoi.id));
-    if (parentZone) {
+    if (parentZone && parentZone.id !== activeZoneId) {
       handleZoomToZone(parentZone);
     }
   }, [selectedPoi?.id, zones]);
 
-  // Стили и иконки для категорий
-  const getCategoryStyles = (category: string) => {
+  // Иконки категорий (соответствуют верхней панели)
+  const getCategoryDetails = (category: string) => {
     switch (category) {
       case 'sponsor':
-        return { bg: '#E30613', icon: Award, label: 'Стенд ТТК' };
+        return { bg: '#E30613', border: '#f87171', icon: Award, label: 'Стенд ТТК' };
       case 'hall':
-        return { bg: '#6366f1', icon: Presentation, label: 'Зал' };
+        return { bg: '#6366f1', border: '#a5b4fc', icon: Presentation, label: 'Конференц-зал' };
       case 'food':
-        return { bg: '#f59e0b', icon: Coffee, label: 'Кофе' };
+        return { bg: '#f59e0b', border: '#fde68a', icon: Coffee, label: 'Кофе-брейк' };
       case 'wc':
-        return { bg: '#06b6d4', icon: Bath, label: 'Санузел' };
+        return { bg: '#06b6d4', border: '#67e8f9', icon: Bath, label: 'Санузел WC' };
       case 'wifi':
-        return { bg: '#3b82f6', icon: Wifi, label: 'Wi-Fi 6' };
+        return { bg: '#3b82f6', border: '#93c5fd', icon: Wifi, label: 'Wi-Fi 6 ТТК' };
       case 'entrance':
       case 'service':
       default:
-        return { bg: '#10b981', icon: DoorOpen, label: 'Сервис' };
+        return { bg: '#10b981', border: '#6ee7b7', icon: DoorOpen, label: 'Сервис & Вход' };
     }
   };
 
-  // Активная зона и ее содержимое
+  // Активная зона
   const currentActiveZone = zones.find(z => z.id === activeZoneId);
 
-  // Значки POI отображаются ТОЛЬКО если активна их зона (или если строится активный маршрут)
+  // Значки эмблем POI появляются ТОЛЬКО внутри выбранного зала (или при активном маршруте)
   const visiblePois = useMemo(() => {
     if (activeRoute) return pois;
     if (!currentActiveZone) return [];
     return pois.filter(p => currentActiveZone.poiIds.includes(p.id));
   }, [currentActiveZone, pois, activeRoute]);
 
-  // Значки 360 панорам отображаются ТОЛЬКО если активна их зона
+  // Значки эмблем 360° панорам появляются ТОЛЬКО внутри выбранного зала
   const visiblePanos = useMemo(() => {
     if (activeRoute) return floor.panoramas;
     if (!currentActiveZone) return [];
@@ -414,11 +439,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      className="relative flex-1 w-full h-full bg-slate-950 overflow-hidden cursor-grab active:cursor-grabbing select-none"
+      className={`relative flex-1 w-full h-full bg-slate-950 overflow-hidden select-none ${
+        scale > BASE_SCALE ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'
+      }`}
     >
       {/* Сетка фона */}
       <div
-        className="absolute inset-0 opacity-[0.04] pointer-events-none"
+        className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
           backgroundImage:
             'radial-gradient(circle at 1px 1px, rgba(255,255,255,0.8) 1px, transparent 0)',
@@ -426,18 +453,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         }}
       />
 
-      {/* Кнопка быстрого возврата ко всей карте (когда мы внутри зоны) */}
+      {/* Кнопка быстрого возврата ко всей карте */}
       {activeZoneId && (
         <button
           onClick={handleResetView}
-          className="absolute top-4 left-3 z-30 flex items-center gap-2 bg-slate-900/95 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-xl border border-slate-700/80 shadow-2xl backdrop-blur-md active:scale-95 transition-all animate-in fade-in"
+          className="absolute top-4 left-3 z-30 flex items-center gap-2 bg-slate-900/95 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl border border-slate-700/80 shadow-2xl backdrop-blur-md active:scale-95 transition-all animate-in fade-in"
         >
           <ArrowLeft className="w-4 h-4 text-[#E30613]" />
-          <span>Вся карта (100%)</span>
+          <span>← Вся карта (100%)</span>
         </button>
       )}
 
-      {/* Кнопки управления зумом (Плавающие справа) */}
+      {/* Кнопки управления зумом */}
       <div className="absolute top-4 right-3 z-20 flex flex-col items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/60 shadow-xl">
         <button
           onClick={() => handleZoom(0.25)}
@@ -471,7 +498,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </button>
       </div>
 
-      {/* Холст карты с плавным зумом */}
+      {/* SVG Холст карты — растянут по ширине и высоте */}
       <div
         className="w-full h-full flex items-center justify-center transition-transform duration-300 ease-out"
         style={{
@@ -481,7 +508,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       >
         <svg
           viewBox="0 0 1200 800"
-          className="w-full h-full max-w-[1200px] max-h-[800px] overflow-visible drop-shadow-2xl"
+          className="w-full h-full object-contain overflow-visible drop-shadow-2xl"
         >
           <defs>
             <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
@@ -493,37 +520,39 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               </feMerge>
             </filter>
 
-            <filter id="boxShadow" x="-10%" y="-10%" width="120%" height="120%">
-              <feDropShadow dx="0" dy="4" stdDeviation="6" floodOpacity="0.4" floodColor="#000" />
+            <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="6" stdDeviation="6" floodOpacity="0.5" floodColor="#000" />
             </filter>
 
-            <pattern id="floorTile" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#334155" strokeWidth="0.5" strokeOpacity="0.4" />
+            <pattern id="floorTile" width="30" height="30" patternUnits="userSpaceOnUse">
+              <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#334155" strokeWidth="0.5" strokeOpacity="0.35" />
             </pattern>
           </defs>
 
           {/* ================= 1 ЭТАЖ ================= */}
           {floor.level === 1 && (
             <g id="floor-1-geometry">
-              {/* Внешний контур здания */}
+              {/* Растянутый внешний контур здания (ровно по сетке) */}
               <rect
-                x="60"
-                y="60"
-                width="1080"
-                height="680"
-                rx="24"
+                x="20"
+                y="20"
+                width="1160"
+                height="760"
+                rx="20"
                 fill="#0f172a"
                 stroke="#334155"
                 strokeWidth="4"
               />
 
-              {/* Коридоры */}
-              <rect x="480" y="160" width="240" height="580" fill="url(#floorTile)" opacity="0.8" />
-              <rect x="180" y="240" width="840" height="120" fill="url(#floorTile)" opacity="0.8" />
+              {/* Коридорная сетка */}
+              {/* Центральная вертикальная аллея */}
+              <rect x="460" y="50" width="280" height="700" fill="url(#floorTile)" opacity="0.8" />
+              {/* Горизонтальный соединительный коридор */}
+              <rect x="150" y="220" width="900" height="110" fill="url(#floorTile)" opacity="0.8" />
 
-              {/* 1. Кликабельный прямоугольник: Зал «Сириус» */}
+              {/* 1. Прямоугольник: Зал «Сириус» (Слева) */}
               <g
-                className="cursor-pointer group transition-all"
+                className="cursor-pointer transition-all"
                 onClick={() => {
                   const z = zones.find(z => z.id === 'zone-sirius');
                   if (z) handleZoomToZone(z);
@@ -532,34 +561,39 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPointerLeave={() => setHoveredZoneId(null)}
               >
                 <rect
-                  x="100"
-                  y="100"
-                  width="340"
-                  height="400"
-                  rx="16"
+                  x="50"
+                  y="50"
+                  width="380"
+                  height="430"
+                  rx="18"
                   fill="#1e1b4b"
-                  fillOpacity={activeZoneId === 'zone-sirius' ? 0.7 : hoveredZoneId === 'zone-sirius' ? 0.55 : 0.4}
+                  fillOpacity={activeZoneId === 'zone-sirius' ? 0.75 : hoveredZoneId === 'zone-sirius' ? 0.6 : 0.45}
                   stroke={activeZoneId === 'zone-sirius' ? '#818cf8' : hoveredZoneId === 'zone-sirius' ? '#a5b4fc' : '#4f46e5'}
                   strokeWidth={activeZoneId === 'zone-sirius' || hoveredZoneId === 'zone-sirius' ? 3.5 : 2}
                   strokeDasharray="6 3"
                   className="transition-all duration-200"
                 />
+                {/* Верхняя плашка сцены */}
+                <rect x="70" y="70" width="340" height="45" rx="8" fill="#312e81" fillOpacity="0.6" />
+                <text x="240" y="98" textAnchor="middle" fill="#c7d2fe" fontSize="14" fontWeight="bold">
+                  СЦЕНА И ЭКРАН
+                </text>
                 <text
-                  x="270"
-                  y="290"
+                  x="240"
+                  y="260"
                   textAnchor="middle"
                   fill={activeZoneId === 'zone-sirius' || hoveredZoneId === 'zone-sirius' ? '#ffffff' : '#c7d2fe'}
                   fontSize="22"
                   fontWeight="800"
-                  className="transition-colors pointer-events-none"
+                  className="pointer-events-none"
                 >
                   Конференц-зал «Сириус»
                 </text>
               </g>
 
-              {/* 2. Кликабельный прямоугольник: Кофе-брейк & Lounge */}
+              {/* 2. Прямоугольник: Кофе-брейк & Lounge (Справа, симметрично) */}
               <g
-                className="cursor-pointer group transition-all"
+                className="cursor-pointer transition-all"
                 onClick={() => {
                   const z = zones.find(z => z.id === 'zone-food');
                   if (z) handleZoomToZone(z);
@@ -568,34 +602,38 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPointerLeave={() => setHoveredZoneId(null)}
               >
                 <rect
-                  x="780"
-                  y="100"
-                  width="320"
-                  height="400"
-                  rx="16"
+                  x="770"
+                  y="50"
+                  width="380"
+                  height="430"
+                  rx="18"
                   fill="#451a03"
-                  fillOpacity={activeZoneId === 'zone-food' ? 0.7 : hoveredZoneId === 'zone-food' ? 0.55 : 0.4}
+                  fillOpacity={activeZoneId === 'zone-food' ? 0.75 : hoveredZoneId === 'zone-food' ? 0.6 : 0.45}
                   stroke={activeZoneId === 'zone-food' ? '#fbbf24' : hoveredZoneId === 'zone-food' ? '#fde68a' : '#d97706'}
                   strokeWidth={activeZoneId === 'zone-food' || hoveredZoneId === 'zone-food' ? 3.5 : 2}
                   strokeDasharray="6 3"
                   className="transition-all duration-200"
                 />
+                <rect x="790" y="70" width="340" height="45" rx="8" fill="#78350f" fillOpacity="0.6" />
+                <text x="960" y="98" textAnchor="middle" fill="#fde68a" fontSize="14" fontWeight="bold">
+                  ЗОНА ОТДЫХА И КОФЕ
+                </text>
                 <text
-                  x="940"
-                  y="290"
+                  x="960"
+                  y="260"
                   textAnchor="middle"
                   fill={activeZoneId === 'zone-food' || hoveredZoneId === 'zone-food' ? '#ffffff' : '#fde68a'}
                   fontSize="22"
                   fontWeight="800"
-                  className="transition-colors pointer-events-none"
+                  className="pointer-events-none"
                 >
                   Кофе-брейк & Lounge
                 </text>
               </g>
 
-              {/* 3. Кликабельный объект: Центральный стенд ТТК */}
+              {/* 3. Центр: Центральный стенд ТТК (Идеально отцентрован на X=600, Y=360) */}
               <g
-                className="cursor-pointer group transition-all"
+                className="cursor-pointer transition-all"
                 onClick={() => {
                   const z = zones.find(z => z.id === 'zone-ttk');
                   if (z) handleZoomToZone(z);
@@ -605,22 +643,23 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               >
                 <circle
                   cx="600"
-                  cy="400"
-                  r="105"
+                  cy="360"
+                  r="115"
                   fill="#1e293b"
-                  fillOpacity={activeZoneId === 'zone-ttk' ? 0.9 : 0.7}
+                  fillOpacity={activeZoneId === 'zone-ttk' ? 0.9 : 0.75}
                   stroke="#E30613"
                   strokeWidth={activeZoneId === 'zone-ttk' || hoveredZoneId === 'zone-ttk' ? 4 : 2.5}
                   strokeDasharray="8 4"
                   className="transition-all duration-200"
                 />
-                <rect x="525" y="380" width="150" height="40" rx="8" fill="#E30613" />
+                {/* Выровненный логотип ТТК по центру */}
+                <rect x="505" y="335" width="190" height="48" rx="10" fill="#E30613" filter="url(#dropShadow)" />
                 <text
                   x="600"
-                  y="405"
+                  y="366"
                   textAnchor="middle"
                   fill="white"
-                  fontSize="15"
+                  fontSize="16"
                   fontWeight="900"
                   letterSpacing="2"
                   className="pointer-events-none"
@@ -629,7 +668,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 </text>
               </g>
 
-              {/* 4. Кликабельный объект: Зона Wi-Fi 6 */}
+              {/* 4. Центр: Зона Wi-Fi 6 ТТК (На центральной оси X=600, Y=540) */}
               <g
                 className="cursor-pointer transition-all"
                 onClick={() => {
@@ -641,20 +680,20 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               >
                 <circle
                   cx="600"
-                  cy="570"
+                  cy="540"
                   r="45"
                   fill="#0369a1"
-                  fillOpacity={activeZoneId === 'zone-wifi-1' ? 0.4 : 0.15}
+                  fillOpacity={activeZoneId === 'zone-wifi-1' ? 0.45 : 0.2}
                   stroke="#38bdf8"
                   strokeWidth={activeZoneId === 'zone-wifi-1' || hoveredZoneId === 'zone-wifi-1' ? 3 : 1.5}
                   strokeDasharray="4 4"
                 />
-                <text x="600" y="575" textAnchor="middle" fill="#38bdf8" fontSize="11" fontWeight="bold">
-                  Wi-Fi 6
+                <text x="600" y="545" textAnchor="middle" fill="#38bdf8" fontSize="12" fontWeight="bold">
+                  Wi-Fi 6 ТТК
                 </text>
               </g>
 
-              {/* 5. Кликабельный прямоугольник: Входная группа */}
+              {/* 5. Внизу: Входная группа & Регистрация (Отцентрована на X=600) */}
               <g
                 className="cursor-pointer transition-all"
                 onClick={() => {
@@ -665,23 +704,23 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPointerLeave={() => setHoveredZoneId(null)}
               >
                 <rect
-                  x="420"
-                  y="670"
-                  width="360"
-                  height="80"
-                  rx="12"
+                  x="430"
+                  y="650"
+                  width="340"
+                  height="95"
+                  rx="14"
                   fill="#064e3b"
-                  fillOpacity={activeZoneId === 'zone-entrance' ? 0.7 : hoveredZoneId === 'zone-entrance' ? 0.55 : 0.4}
+                  fillOpacity={activeZoneId === 'zone-entrance' ? 0.75 : hoveredZoneId === 'zone-entrance' ? 0.6 : 0.45}
                   stroke="#10b981"
                   strokeWidth={activeZoneId === 'zone-entrance' || hoveredZoneId === 'zone-entrance' ? 3.5 : 2}
                   className="transition-all duration-200"
                 />
-                <text x="600" y="718" textAnchor="middle" fill="#6ee7b7" fontSize="17" fontWeight="bold">
+                <text x="600" y="702" textAnchor="middle" fill="#6ee7b7" fontSize="16" fontWeight="bold">
                   ВХОДНАЯ ГРУППА & РЕГИСТРАЦИЯ
                 </text>
               </g>
 
-              {/* 6. Кликабельный прямоугольник: Лестница на 2 этаж */}
+              {/* 6. Внизу слева: Лестница на 2 этаж (Симметрично) */}
               <g
                 className="cursor-pointer transition-all"
                 onClick={() => {
@@ -692,24 +731,24 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPointerLeave={() => setHoveredZoneId(null)}
               >
                 <rect
-                  x="180"
+                  x="60"
                   y="600"
-                  width="220"
-                  height="90"
-                  rx="10"
+                  width="340"
+                  height="145"
+                  rx="14"
                   fill="#1e293b"
                   stroke="#64748b"
                   strokeWidth={activeZoneId === 'zone-stairs-1' || hoveredZoneId === 'zone-stairs-1' ? 3 : 2}
                 />
-                <line x1="210" y1="625" x2="370" y2="625" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="210" y1="645" x2="370" y2="645" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="210" y1="665" x2="370" y2="665" stroke="#94a3b8" strokeWidth="2" />
-                <text x="290" y="614" textAnchor="middle" fill="#94a3b8" fontSize="12" fontWeight="bold">
+                <line x1="100" y1="640" x2="360" y2="640" stroke="#94a3b8" strokeWidth="2" />
+                <line x1="100" y1="670" x2="360" y2="670" stroke="#94a3b8" strokeWidth="2" />
+                <line x1="100" y1="700" x2="360" y2="700" stroke="#94a3b8" strokeWidth="2" />
+                <text x="230" y="626" textAnchor="middle" fill="#94a3b8" fontSize="13" fontWeight="bold">
                   Лестница на 2 этаж ▲
                 </text>
               </g>
 
-              {/* 7. Кликабельный прямоугольник: Санузлы WC */}
+              {/* 7. Внизу справа: Санузлы WC (Симметрично) */}
               <g
                 className="cursor-pointer transition-all"
                 onClick={() => {
@@ -720,18 +759,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPointerLeave={() => setHoveredZoneId(null)}
               >
                 <rect
-                  x="940"
-                  y="640"
-                  width="160"
-                  height="90"
-                  rx="10"
+                  x="800"
+                  y="600"
+                  width="340"
+                  height="145"
+                  rx="14"
                   fill="#083344"
                   fillOpacity={activeZoneId === 'zone-wc-1' ? 0.8 : hoveredZoneId === 'zone-wc-1' ? 0.65 : 0.5}
                   stroke="#0891b2"
                   strokeWidth={activeZoneId === 'zone-wc-1' || hoveredZoneId === 'zone-wc-1' ? 3 : 2}
                 />
-                <text x="1020" y="692" textAnchor="middle" fill="#67e8f9" fontSize="14" fontWeight="bold">
-                  Санузлы WC
+                <text x="970" y="675" textAnchor="middle" fill="#67e8f9" fontSize="16" fontWeight="bold">
+                  Санузлы WC (М / Ж / МГН)
                 </text>
               </g>
             </g>
@@ -741,16 +780,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           {floor.level === 2 && (
             <g id="floor-2-geometry">
               <rect
-                x="60"
-                y="60"
-                width="1080"
-                height="680"
-                rx="24"
+                x="20"
+                y="20"
+                width="1160"
+                height="760"
+                rx="20"
                 fill="#0f172a"
                 stroke="#334155"
                 strokeWidth="4"
               />
-              <rect x="180" y="480" width="840" height="160" fill="url(#floorTile)" opacity="0.8" />
+              <rect x="150" y="500" width="900" height="150" fill="url(#floorTile)" opacity="0.8" />
 
               {/* VIP Lounge */}
               <g
@@ -763,17 +802,17 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPointerLeave={() => setHoveredZoneId(null)}
               >
                 <rect
-                  x="420"
-                  y="140"
-                  width="360"
-                  height="340"
-                  rx="16"
+                  x="430"
+                  y="90"
+                  width="340"
+                  height="420"
+                  rx="18"
                   fill="#4c0519"
-                  fillOpacity={activeZoneId === 'zone-vip' ? 0.7 : hoveredZoneId === 'zone-vip' ? 0.55 : 0.4}
+                  fillOpacity={activeZoneId === 'zone-vip' ? 0.75 : hoveredZoneId === 'zone-vip' ? 0.6 : 0.45}
                   stroke="#e11d48"
                   strokeWidth={activeZoneId === 'zone-vip' || hoveredZoneId === 'zone-vip' ? 3.5 : 2}
                 />
-                <text x="600" y="310" textAnchor="middle" fill="#fda4af" fontSize="22" fontWeight="bold">
+                <text x="600" y="300" textAnchor="middle" fill="#fda4af" fontSize="22" fontWeight="bold">
                   VIP Lounge ТТК
                 </text>
               </g>
@@ -789,16 +828,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPointerLeave={() => setHoveredZoneId(null)}
               >
                 <rect
-                  x="120"
-                  y="180"
-                  width="260"
-                  height="280"
-                  rx="16"
+                  x="60"
+                  y="110"
+                  width="340"
+                  height="400"
+                  rx="18"
                   fill="#1e293b"
                   stroke="#6366f1"
                   strokeWidth={activeZoneId === 'zone-room-a' || hoveredZoneId === 'zone-room-a' ? 3 : 2}
                 />
-                <text x="250" y="325" textAnchor="middle" fill="#e2e8f0" fontSize="18" fontWeight="bold">
+                <text x="230" y="310" textAnchor="middle" fill="#e2e8f0" fontSize="20" fontWeight="bold">
                   Переговорная «Байкал»
                 </text>
               </g>
@@ -814,16 +853,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPointerLeave={() => setHoveredZoneId(null)}
               >
                 <rect
-                  x="820"
-                  y="180"
-                  width="260"
-                  height="280"
-                  rx="16"
+                  x="800"
+                  y="110"
+                  width="340"
+                  height="400"
+                  rx="18"
                   fill="#1e293b"
                   stroke="#6366f1"
                   strokeWidth={activeZoneId === 'zone-room-b' || hoveredZoneId === 'zone-room-b' ? 3 : 2}
                 />
-                <text x="950" y="325" textAnchor="middle" fill="#e2e8f0" fontSize="18" fontWeight="bold">
+                <text x="970" y="310" textAnchor="middle" fill="#e2e8f0" fontSize="20" fontWeight="bold">
                   Переговорная «Енисей»
                 </text>
               </g>
@@ -839,19 +878,19 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPointerLeave={() => setHoveredZoneId(null)}
               >
                 <rect
-                  x="180"
+                  x="60"
                   y="600"
-                  width="220"
-                  height="90"
-                  rx="10"
+                  width="340"
+                  height="145"
+                  rx="14"
                   fill="#1e293b"
                   stroke="#64748b"
                   strokeWidth={activeZoneId === 'zone-stairs-2' || hoveredZoneId === 'zone-stairs-2' ? 3 : 2}
                 />
-                <line x1="210" y1="625" x2="370" y2="625" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="210" y1="645" x2="370" y2="645" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="210" y1="665" x2="370" y2="665" stroke="#94a3b8" strokeWidth="2" />
-                <text x="290" y="650" textAnchor="middle" fill="#94a3b8" fontSize="13" fontWeight="bold">
+                <line x1="100" y1="640" x2="360" y2="640" stroke="#94a3b8" strokeWidth="2" />
+                <line x1="100" y1="670" x2="360" y2="670" stroke="#94a3b8" strokeWidth="2" />
+                <line x1="100" y1="700" x2="360" y2="700" stroke="#94a3b8" strokeWidth="2" />
+                <text x="230" y="675" textAnchor="middle" fill="#94a3b8" fontSize="14" fontWeight="bold">
                   Спуск на 1 этаж ▼
                 </text>
               </g>
@@ -890,7 +929,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </g>
           )}
 
-          {/* ================= МАЛЕНЬКИЕ ЗНАЧКИ 360° ПАНОРАМ (ПОЯВЛЯЮТСЯ ВНУТРИ ЗОНЫ) ================= */}
+          {/* ================= ЭМБЛЕМЫ 360° ПАНОРАМ (ПОЯВЛЯЮТСЯ ВНУТРИ ВЫБРАННОЙ ЗОНЫ) ================= */}
           {visiblePanos.map(pano => {
             const isHovered = hoveredItemId === pano.id;
 
@@ -913,30 +952,33 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 <circle
                   cx="0"
                   cy="0"
-                  r="13"
+                  r="15"
                   fill="#0284c7"
                   stroke="white"
-                  strokeWidth="2"
+                  strokeWidth="2.5"
                   className="shadow-xl"
                 />
-                <Camera className="w-3.5 h-3.5 text-white -translate-x-1.5 -translate-y-1.5 pointer-events-none" />
+                <Camera className="w-4 h-4 text-white -translate-x-2 -translate-y-2 pointer-events-none" />
 
-                {/* Всплывающий текст СНИЗУ при наведении */}
+                {/* Всплывающий текст СНИЗУ («снизу появляется текст что это да кто это») */}
                 {isHovered && (
                   <g transform="translate(0, 24)" className="pointer-events-none animate-in fade-in duration-150">
                     <rect
                       x="-85"
                       y="0"
                       width="170"
-                      height="26"
+                      height="28"
                       rx="8"
                       fill="#0f172a"
                       stroke="#38bdf8"
                       strokeWidth="1.5"
                       className="shadow-2xl"
                     />
-                    <text x="0" y="17" textAnchor="middle" fill="#ffffff" fontSize="10" fontWeight="bold">
+                    <text x="0" y="14" textAnchor="middle" fill="#ffffff" fontSize="10" fontWeight="bold">
                       {pano.title || '360° Виртуальный тур'}
+                    </text>
+                    <text x="0" y="23" textAnchor="middle" fill="#38bdf8" fontSize="8" fontWeight="600">
+                      Нажмите для просмотра сферы
                     </text>
                   </g>
                 )}
@@ -944,12 +986,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             );
           })}
 
-          {/* ================= МАЛЕНЬКИЕ ЗНАЧКИ POI (ПОЯВЛЯЮТСЯ ВНУТРИ ЗОНЫ) ================= */}
+          {/* ================= ЭМБЛЕМЫ POI (ПОЯВЛЯЮТСЯ ВНУТРИ ВЫБРАННОЙ ЗОНЫ) ================= */}
           {visiblePois.map(poi => {
             const isSelected = selectedPoi?.id === poi.id;
             const isHovered = hoveredItemId === poi.id;
             const showTooltip = isHovered || isSelected;
-            const style = getCategoryStyles(poi.category);
+            const details = getCategoryDetails(poi.category);
+            const Icon = details.icon;
 
             return (
               <g
@@ -973,24 +1016,24 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   <circle
                     cx="0"
                     cy="0"
-                    r="20"
-                    fill={style.bg}
-                    fillOpacity="0.3"
+                    r="22"
+                    fill={details.bg}
+                    fillOpacity="0.35"
                     className="animate-ping"
                   />
                 )}
 
-                {/* Аккуратный маленький значок */}
+                {/* Эмблема категории */}
                 <circle
                   cx="0"
                   cy="0"
-                  r="13"
-                  fill={style.bg}
+                  r="15"
+                  fill={details.bg}
                   stroke="white"
-                  strokeWidth="2"
+                  strokeWidth="2.5"
                   className="shadow-lg"
                 />
-                <circle cx="0" cy="0" r="4" fill="white" />
+                <Icon className="w-4 h-4 text-white -translate-x-2 -translate-y-2 pointer-events-none" />
 
                 {/* Всплывающий текст СНИЗУ («снизу появляется текст что это да кто это») */}
                 {showTooltip && (
@@ -999,10 +1042,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                       x={-((poi.name.length * 7.5) / 2 + 12)}
                       y="0"
                       width={poi.name.length * 7.5 + 24}
-                      height="30"
+                      height="32"
                       rx="8"
                       fill="#0f172a"
-                      stroke={isSelected ? '#E30613' : '#38bdf8'}
+                      stroke={isSelected ? '#E30613' : details.border}
                       strokeWidth="1.5"
                       className="shadow-2xl"
                     />
@@ -1018,13 +1061,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                     </text>
                     <text
                       x="0"
-                      y="24"
+                      y="25"
                       textAnchor="middle"
                       fill="#94a3b8"
                       fontSize="8"
                       fontWeight="600"
                     >
-                      {style.label}
+                      {details.label} • Нажмите для карточки
                     </text>
                   </g>
                 )}

@@ -19,6 +19,7 @@ export default function App() {
   const [selectedPoi, setSelectedPoi] = useState<POI | null>(null);
   const [activeRoute, setActiveRoute] = useState<RouteResponse | null>(null);
   const [routeTargetPoi, setRouteTargetPoi] = useState<POI | null>(null);
+  const [activeZoneId, setActiveZoneId] = useState<string | null>(null);
 
   const [activePanoId, setActivePanoId] = useState<string | null>(null);
   const [showPanoModal, setShowPanoModal] = useState<boolean>(false);
@@ -81,6 +82,8 @@ export default function App() {
         else if (activeRoute) {
           setActiveRoute(null);
           setRouteTargetPoi(null);
+        } else if (activeZoneId) {
+          setActiveZoneId(null);
         }
       }
     };
@@ -186,18 +189,25 @@ export default function App() {
           setActiveFloorId(id);
           setSelectedPoi(null);
           setActiveRoute(null);
+          setActiveZoneId(null);
         }}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         isBackendConnected={isBackendConnected}
       />
 
-      {/* 2. Быстрые горизонтальные фильтры категорий */}
-      <CategoryFilters
-        selectedCategory={selectedCategory}
-        onSelectCategory={setSelectedCategory}
-        categoryCounts={categoryCounts}
-      />
+      {/* 2. Быстрые горизонтальные фильтры категорий (сворачиваются при зуме в помещение) */}
+      <div
+        className={`transition-all duration-300 ease-in-out overflow-hidden ${
+          activeZoneId ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-16 opacity-100'
+        }`}
+      >
+        <CategoryFilters
+          selectedCategory={selectedCategory}
+          onSelectCategory={setSelectedCategory}
+          categoryCounts={categoryCounts}
+        />
+      </div>
 
       {/* 3. Интерактивная 2D Карта с плавным Pan & Zoom */}
       <InteractiveMap
@@ -206,10 +216,11 @@ export default function App() {
         selectedPoi={selectedPoi}
         onSelectPoi={poi => {
           setSelectedPoi(poi);
-          // Если открыт маршрут, не сбрасываем его сразу
         }}
         activeRoute={activeRoute}
         onOpenPanorama={handleOpenPanorama}
+        activeZoneId={activeZoneId}
+        onZoneChange={setActiveZoneId}
       />
 
       {/* 4. Шторка информации о выбранной точке (Bottom Sheet) */}

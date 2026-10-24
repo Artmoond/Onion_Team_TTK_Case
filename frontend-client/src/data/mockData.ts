@@ -24,8 +24,8 @@ export const mockVenue: Venue = {
           name: 'Главный вход & Регистрация',
           category: 'entrance',
           description: 'Выдача бейджей участников, справочная служба ТТК, гардероб и навигационные терминалы.',
-          x: 555,
-          y: 715,
+          x: 560,
+          y: 695,
           isPublic: true,
           panoramaId: 'pano-entrance',
           tags: ['вход', 'регистрация', 'ресепшн', 'бейдж', 'гардероб']
@@ -36,8 +36,8 @@ export const mockVenue: Venue = {
           name: 'Центральный стенд ТТК',
           category: 'sponsor',
           description: 'Флагманский стенд ТрансТелеКом: демонстрация indoor-навигации, квантовых каналов, IoT решений и приватных сетей.',
-          x: 565,
-          y: 400,
+          x: 550,
+          y: 410,
           isPublic: true,
           panoramaId: 'pano-ttk',
           tags: ['ттк', 'стенд', 'инновации', 'квантовые', 'indoor']
@@ -48,8 +48,8 @@ export const mockVenue: Venue = {
           name: 'Конференц-зал «Сириус»',
           category: 'hall',
           description: 'Главная сцена: ключевые пленарные сессии, круглые столы, защита хакатон-проектов (вместимость 500 чел).',
-          x: 230,
-          y: 310,
+          x: 200,
+          y: 320,
           isPublic: true,
           panoramaId: 'pano-hall',
           tags: ['зал', 'сцена', 'сириус', 'доклады', 'спикеры']
@@ -60,8 +60,8 @@ export const mockVenue: Venue = {
           name: 'Кофе-брейк и Lounge-зона',
           category: 'food',
           description: 'Свежесваренный кофе, чай, выпечка, мягкие пуфы и зона нетворкинга участников.',
-          x: 900,
-          y: 310,
+          x: 920,
+          y: 320,
           isPublic: true,
           panoramaId: 'pano-food',
           tags: ['кофе', 'еда', 'чай', 'обед', 'лаундж', 'перерыв']
@@ -72,8 +72,8 @@ export const mockVenue: Venue = {
           name: 'Санузлы (1 этаж)',
           category: 'wc',
           description: 'Мужской, женский и специально оборудованный санузел для маломобильных групп граждан (МГН).',
-          x: 1050,
-          y: 700,
+          x: 970,
+          y: 665,
           isPublic: true,
           tags: ['wc', 'туалет', 'санузел', 'уборная']
         },
@@ -84,7 +84,7 @@ export const mockVenue: Venue = {
           category: 'wifi',
           description: 'Зона усиленного радиопокрытия гигабитным беспроводным интернетом от магистрального провайдера ТТК.',
           x: 600,
-          y: 570,
+          y: 540,
           isPublic: true,
           tags: ['wifi', 'интернет', 'вайфай', 'сеть']
         },
@@ -94,8 +94,8 @@ export const mockVenue: Venue = {
           name: 'Лестница на 2 этаж',
           category: 'service',
           description: 'Широкая парадная лестница с выходом к переговорным залам и VIP-лаунджу второго яруса.',
-          x: 300,
-          y: 650,
+          x: 230,
+          y: 665,
           isPublic: true,
           tags: ['лестница', '2 этаж', 'подъем', 'переход']
         }
@@ -105,8 +105,8 @@ export const mockVenue: Venue = {
           id: 'pano-entrance',
           floorId: 'floor-1',
           title: '360° Входная группа и Регистрация',
-          x: 645,
-          y: 715,
+          x: 640,
+          y: 695,
           url: '/demo-pano.webp',
           previewUrl: '/demo-pano.webp',
           yawOffset: 0,
@@ -135,8 +135,8 @@ export const mockVenue: Venue = {
           id: 'pano-ttk',
           floorId: 'floor-1',
           title: '360° Центральный стенд ТТК',
-          x: 635,
-          y: 400,
+          x: 650,
+          y: 410,
           url: '/demo-pano-2.webp',
           previewUrl: '/demo-pano-2.webp',
           yawOffset: 0,
@@ -183,8 +183,8 @@ export const mockVenue: Venue = {
           id: 'pano-hall',
           floorId: 'floor-1',
           title: '360° Конференц-зал «Сириус»',
-          x: 310,
-          y: 310,
+          x: 280,
+          y: 320,
           url: '/demo-pano.webp',
           previewUrl: '/demo-pano.webp',
           yawOffset: 90,
@@ -213,8 +213,8 @@ export const mockVenue: Venue = {
           id: 'pano-food',
           floorId: 'floor-1',
           title: '360° Кофе-брейк зона',
-          x: 980,
-          y: 310,
+          x: 1000,
+          y: 320,
           url: '/demo-pano-2.webp',
           previewUrl: '/demo-pano-2.webp',
           yawOffset: -90,
@@ -242,25 +242,25 @@ export const mockVenue: Venue = {
       ],
       graph: {
         nodes: [
-          { id: 'n-entrance', floorId: 'floor-1', x: 600, y: 740, kind: 'door' },
-          { id: 'n-cross-main', floorId: 'floor-1', x: 600, y: 600, kind: 'corridor' },
-          { id: 'n-wifi', floorId: 'floor-1', x: 600, y: 570, kind: 'corridor' },
-          { id: 'n-ttk-stand', floorId: 'floor-1', x: 600, y: 400, kind: 'corridor' },
-          { id: 'n-cross-north', floorId: 'floor-1', x: 600, y: 300, kind: 'corridor' },
-          { id: 'n-hall-door', floorId: 'floor-1', x: 250, y: 300, kind: 'door' },
-          { id: 'n-food-door', floorId: 'floor-1', x: 950, y: 300, kind: 'door' },
-          { id: 'n-stairs-1', floorId: 'floor-1', x: 300, y: 650, kind: 'stairs' },
-          { id: 'n-wc-1', floorId: 'floor-1', x: 1050, y: 700, kind: 'door' }
+          { id: 'n-entrance', floorId: 'floor-1', x: 600, y: 695, kind: 'door' },
+          { id: 'n-cross-main', floorId: 'floor-1', x: 600, y: 580, kind: 'corridor' },
+          { id: 'n-wifi', floorId: 'floor-1', x: 600, y: 540, kind: 'corridor' },
+          { id: 'n-ttk-stand', floorId: 'floor-1', x: 600, y: 360, kind: 'corridor' },
+          { id: 'n-cross-north', floorId: 'floor-1', x: 600, y: 260, kind: 'corridor' },
+          { id: 'n-hall-door', floorId: 'floor-1', x: 430, y: 260, kind: 'door' },
+          { id: 'n-food-door', floorId: 'floor-1', x: 770, y: 260, kind: 'door' },
+          { id: 'n-stairs-1', floorId: 'floor-1', x: 390, y: 665, kind: 'stairs' },
+          { id: 'n-wc-1', floorId: 'floor-1', x: 810, y: 665, kind: 'door' }
         ],
         edges: [
-          { id: 'e1', fromId: 'n-entrance', toId: 'n-cross-main', lengthMeters: 7, kind: 'walk', bidirectional: true },
+          { id: 'e1', fromId: 'n-entrance', toId: 'n-cross-main', lengthMeters: 6, kind: 'walk', bidirectional: true },
           { id: 'e-wifi', fromId: 'n-cross-main', toId: 'n-wifi', lengthMeters: 2, kind: 'walk', bidirectional: true },
-          { id: 'e2', fromId: 'n-wifi', toId: 'n-ttk-stand', lengthMeters: 8, kind: 'walk', bidirectional: true },
+          { id: 'e2', fromId: 'n-wifi', toId: 'n-ttk-stand', lengthMeters: 9, kind: 'walk', bidirectional: true },
           { id: 'e3', fromId: 'n-ttk-stand', toId: 'n-cross-north', lengthMeters: 5, kind: 'walk', bidirectional: true },
-          { id: 'e4', fromId: 'n-cross-north', toId: 'n-hall-door', lengthMeters: 17, kind: 'walk', bidirectional: true },
-          { id: 'e5', fromId: 'n-cross-north', toId: 'n-food-door', lengthMeters: 17, kind: 'walk', bidirectional: true },
-          { id: 'e6', fromId: 'n-cross-main', toId: 'n-stairs-1', lengthMeters: 15, kind: 'walk', bidirectional: true },
-          { id: 'e7', fromId: 'n-cross-main', toId: 'n-wc-1', lengthMeters: 22, kind: 'walk', bidirectional: true }
+          { id: 'e4', fromId: 'n-cross-north', toId: 'n-hall-door', lengthMeters: 16, kind: 'walk', bidirectional: true },
+          { id: 'e5', fromId: 'n-cross-north', toId: 'n-food-door', lengthMeters: 16, kind: 'walk', bidirectional: true },
+          { id: 'e6', fromId: 'n-cross-main', toId: 'n-stairs-1', lengthMeters: 14, kind: 'walk', bidirectional: true },
+          { id: 'e7', fromId: 'n-cross-main', toId: 'n-wc-1', lengthMeters: 18, kind: 'walk', bidirectional: true }
         ]
       }
     },
@@ -279,8 +279,8 @@ export const mockVenue: Venue = {
           name: 'Лестничный спуск на 1 этаж',
           category: 'service',
           description: 'Спуск в центральный холл 1 этажа.',
-          x: 300,
-          y: 650,
+          x: 230,
+          y: 665,
           isPublic: true,
           tags: ['лестница', '1 этаж', 'спуск']
         },
@@ -291,7 +291,7 @@ export const mockVenue: Venue = {
           category: 'sponsor',
           description: 'Закрытая зона для стратегических партнеров ТТК, интервью и деловых переговоров.',
           x: 600,
-          y: 350,
+          y: 310,
           isPublic: true,
           tags: ['vip', 'партнеры', 'вип', 'переговоры']
         },
@@ -301,8 +301,8 @@ export const mockVenue: Venue = {
           name: 'Переговорная «Байкал»',
           category: 'hall',
           description: 'Зал для деловых встреч на 16 персон с ВКС-системой от ТТК.',
-          x: 250,
-          y: 350,
+          x: 230,
+          y: 310,
           isPublic: true,
           tags: ['переговорная', 'встречи', 'байкал']
         },
@@ -312,8 +312,8 @@ export const mockVenue: Venue = {
           name: 'Переговорная «Енисей»',
           category: 'hall',
           description: 'Зал для презентаций продуктов и круглых столов.',
-          x: 950,
-          y: 350,
+          x: 970,
+          y: 310,
           isPublic: true,
           tags: ['переговорная', 'енисей', 'встречи']
         }
@@ -321,17 +321,17 @@ export const mockVenue: Venue = {
       panoramas: [],
       graph: {
         nodes: [
-          { id: 'n2-stairs', floorId: 'floor-2', x: 300, y: 650, kind: 'stairs' },
+          { id: 'n2-stairs', floorId: 'floor-2', x: 390, y: 665, kind: 'stairs' },
           { id: 'n2-corridor', floorId: 'floor-2', x: 600, y: 550, kind: 'corridor' },
-          { id: 'n2-vip', floorId: 'floor-2', x: 600, y: 350, kind: 'door' },
-          { id: 'n2-room-a', floorId: 'floor-2', x: 250, y: 350, kind: 'door' },
-          { id: 'n2-room-b', floorId: 'floor-2', x: 950, y: 350, kind: 'door' }
+          { id: 'n2-vip', floorId: 'floor-2', x: 600, y: 310, kind: 'door' },
+          { id: 'n2-room-a', floorId: 'floor-2', x: 390, y: 310, kind: 'door' },
+          { id: 'n2-room-b', floorId: 'floor-2', x: 810, y: 310, kind: 'door' }
         ],
         edges: [
-          { id: 'e2-1', fromId: 'n2-stairs', toId: 'n2-corridor', lengthMeters: 16, kind: 'walk', bidirectional: true },
-          { id: 'e2-2', fromId: 'n2-corridor', toId: 'n2-vip', lengthMeters: 10, kind: 'walk', bidirectional: true },
-          { id: 'e2-3', fromId: 'n2-corridor', toId: 'n2-room-a', lengthMeters: 20, kind: 'walk', bidirectional: true },
-          { id: 'e2-4', fromId: 'n2-corridor', toId: 'n2-room-b', lengthMeters: 20, kind: 'walk', bidirectional: true }
+          { id: 'e2-1', fromId: 'n2-stairs', toId: 'n2-corridor', lengthMeters: 15, kind: 'walk', bidirectional: true },
+          { id: 'e2-2', fromId: 'n2-corridor', toId: 'n2-vip', lengthMeters: 11, kind: 'walk', bidirectional: true },
+          { id: 'e2-3', fromId: 'n2-corridor', toId: 'n2-room-a', lengthMeters: 19, kind: 'walk', bidirectional: true },
+          { id: 'e2-4', fromId: 'n2-corridor', toId: 'n2-room-b', lengthMeters: 19, kind: 'walk', bidirectional: true }
         ]
       }
     }
