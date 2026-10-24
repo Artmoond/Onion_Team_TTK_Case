@@ -25,11 +25,13 @@ interface InteractiveMapProps {
   onOpenPanorama: (panoId: string) => void;
   activeZoneId: string | null;
   onZoneChange: (zoneId: string | null) => void;
+  selectedCategory?: string;
 }
 
 interface MapZone {
   id: string;
   name: string;
+  category: string;
   floorLevel: number;
   shape: 'rect' | 'circle';
   x?: number;
@@ -57,6 +59,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onOpenPanorama,
   activeZoneId,
   onZoneChange,
+  selectedCategory = 'all',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -85,6 +88,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {
           id: 'zone-sirius',
           name: 'Конференц-зал «Сириус»',
+          category: 'hall',
           floorLevel: 1,
           shape: 'rect',
           x: 50,
@@ -101,6 +105,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {
           id: 'zone-food',
           name: 'Кофе-брейк & Lounge',
+          category: 'food',
           floorLevel: 1,
           shape: 'rect',
           x: 770,
@@ -117,6 +122,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {
           id: 'zone-ttk',
           name: 'Центральный стенд ТТК',
+          category: 'sponsor',
           floorLevel: 1,
           shape: 'circle',
           cx: 600,
@@ -132,6 +138,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {
           id: 'zone-wifi-1',
           name: 'Зона Wi-Fi 6 ТТК',
+          category: 'wifi',
           floorLevel: 1,
           shape: 'circle',
           cx: 600,
@@ -147,6 +154,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {
           id: 'zone-entrance',
           name: 'Входная группа & Регистрация',
+          category: 'entrance',
           floorLevel: 1,
           shape: 'rect',
           x: 430,
@@ -163,6 +171,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {
           id: 'zone-stairs-1',
           name: 'Лестница на 2 этаж',
+          category: 'service',
           floorLevel: 1,
           shape: 'rect',
           x: 60,
@@ -179,6 +188,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {
           id: 'zone-wc-1',
           name: 'Санузлы WC',
+          category: 'wc',
           floorLevel: 1,
           shape: 'rect',
           x: 800,
@@ -198,6 +208,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {
           id: 'zone-vip',
           name: 'VIP Lounge ТТК',
+          category: 'sponsor',
           floorLevel: 2,
           shape: 'rect',
           x: 430,
@@ -214,6 +225,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {
           id: 'zone-room-a',
           name: 'Переговорная «Байкал»',
+          category: 'hall',
           floorLevel: 2,
           shape: 'rect',
           x: 60,
@@ -230,6 +242,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {
           id: 'zone-room-b',
           name: 'Переговорная «Енисей»',
+          category: 'hall',
           floorLevel: 2,
           shape: 'rect',
           x: 800,
@@ -246,6 +259,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         {
           id: 'zone-stairs-2',
           name: 'Спуск на 1 этаж',
+          category: 'service',
           floorLevel: 2,
           shape: 'rect',
           x: 60,
@@ -428,12 +442,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Активная зона
   const currentActiveZone = zones.find(z => z.id === activeZoneId);
 
-  // Значки эмблем POI появляются ТОЛЬКО внутри выбранного зала (или при активном маршруте)
+  // Значки эмблем POI появляются внутри выбранного зала ИЛИ при активной категории фильтра
   const visiblePois = useMemo(() => {
     if (activeRoute) return pois;
-    if (!currentActiveZone) return [];
-    return pois.filter(p => currentActiveZone.poiIds.includes(p.id));
-  }, [currentActiveZone, pois, activeRoute]);
+    if (currentActiveZone) {
+      return pois.filter(p => currentActiveZone.poiIds.includes(p.id));
+    }
+    // Если в левой менюшке нажата категория — подсвечиваем и показываем эмблемы этой категории
+    if (selectedCategory && selectedCategory !== 'all') {
+      return pois.filter(p => p.category === selectedCategory);
+    }
+    return [];
+  }, [currentActiveZone, pois, activeRoute, selectedCategory]);
 
   // Значки эмблем 360° панорам появляются ТОЛЬКО внутри выбранного зала
   const visiblePanos = useMemo(() => {
@@ -535,6 +555,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               </feMerge>
             </filter>
 
+            <filter id="highlightGlow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="9" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="blur" />
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+
             <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
               <feDropShadow dx="0" dy="6" stdDeviation="6" floodOpacity="0.5" floodColor="#000" />
             </filter>
@@ -545,372 +575,443 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           </defs>
 
           {/* ================= 1 ЭТАЖ ================= */}
-          {floor.level === 1 && (
-            <g id="floor-1-geometry">
-              {/* Растянутый внешний контур здания (ровно по сетке) */}
-              <rect
-                x="20"
-                y="20"
-                width="1160"
-                height="760"
-                rx="20"
-                fill="#0f172a"
-                stroke="#334155"
-                strokeWidth="4"
-              />
+          {floor.level === 1 && (() => {
+            const isAnyCategoryActive = selectedCategory !== 'all';
+            const isSiriusMatch = selectedCategory === 'hall';
+            const siriusDimmed = isAnyCategoryActive && !isSiriusMatch;
 
-              {/* Коридорная сетка */}
-              {/* Центральная вертикальная аллея */}
-              <rect x="460" y="50" width="280" height="700" fill="url(#floorTile)" opacity="0.8" />
-              {/* Горизонтальный соединительный коридор */}
-              <rect x="150" y="220" width="900" height="110" fill="url(#floorTile)" opacity="0.8" />
+            const isFoodMatch = selectedCategory === 'food';
+            const foodDimmed = isAnyCategoryActive && !isFoodMatch;
 
-              {/* 1. Прямоугольник: Зал «Сириус» (Слева) */}
-              <g
-                className="cursor-pointer transition-all"
-                onClick={() => {
-                  const z = zones.find(z => z.id === 'zone-sirius');
-                  if (z) handleZoomToZone(z);
-                }}
-                onPointerEnter={() => setHoveredZoneId('zone-sirius')}
-                onPointerLeave={() => setHoveredZoneId(null)}
-              >
+            const isTtkMatch = selectedCategory === 'sponsor';
+            const ttkDimmed = isAnyCategoryActive && !isTtkMatch;
+
+            const isWifiMatch = selectedCategory === 'wifi';
+            const wifiDimmed = isAnyCategoryActive && !isWifiMatch;
+
+            const isEntranceMatch = selectedCategory === 'entrance';
+            const entranceDimmed = isAnyCategoryActive && !isEntranceMatch;
+
+            const isStairsMatch = selectedCategory === 'service';
+            const stairsDimmed = isAnyCategoryActive && !isStairsMatch;
+
+            const isWcMatch = selectedCategory === 'wc';
+            const wcDimmed = isAnyCategoryActive && !isWcMatch;
+
+            return (
+              <g id="floor-1-geometry">
+                {/* Растянутый внешний контур здания (ровно по сетке) */}
                 <rect
-                  x="50"
-                  y="50"
-                  width="380"
-                  height="430"
-                  rx="18"
-                  fill="#1e1b4b"
-                  fillOpacity={activeZoneId === 'zone-sirius' ? 0.75 : hoveredZoneId === 'zone-sirius' ? 0.6 : 0.45}
-                  stroke={activeZoneId === 'zone-sirius' ? '#818cf8' : hoveredZoneId === 'zone-sirius' ? '#a5b4fc' : '#4f46e5'}
-                  strokeWidth={activeZoneId === 'zone-sirius' || hoveredZoneId === 'zone-sirius' ? 3.5 : 2}
-                  strokeDasharray="6 3"
-                  className="transition-all duration-200"
+                  x="20"
+                  y="20"
+                  width="1160"
+                  height="760"
+                  rx="20"
+                  fill="#0f172a"
+                  stroke="#334155"
+                  strokeWidth="4"
                 />
-                {/* Верхняя плашка сцены */}
-                <rect x="70" y="70" width="340" height="45" rx="8" fill="#312e81" fillOpacity="0.6" />
-                <text x="240" y="98" textAnchor="middle" fill="#c7d2fe" fontSize="14" fontWeight="bold">
-                  СЦЕНА И ЭКРАН
-                </text>
-                <text
-                  x="240"
-                  y="190"
-                  textAnchor="middle"
-                  fill={activeZoneId === 'zone-sirius' || hoveredZoneId === 'zone-sirius' ? '#ffffff' : '#c7d2fe'}
-                  fontSize="22"
-                  fontWeight="800"
-                  className="pointer-events-none"
+
+                {/* Коридорная сетка */}
+                {/* Центральная вертикальная аллея */}
+                <rect x="460" y="50" width="280" height="700" fill="url(#floorTile)" opacity="0.8" />
+                {/* Горизонтальный соединительный коридор */}
+                <rect x="150" y="220" width="900" height="110" fill="url(#floorTile)" opacity="0.8" />
+
+                {/* 1. Прямоугольник: Зал «Сириус» (Слева) */}
+                <g
+                  className={`cursor-pointer transition-all duration-300 ${siriusDimmed ? 'opacity-25' : 'opacity-100'}`}
+                  onClick={() => {
+                    const z = zones.find(z => z.id === 'zone-sirius');
+                    if (z) handleZoomToZone(z);
+                  }}
+                  onPointerEnter={() => setHoveredZoneId('zone-sirius')}
+                  onPointerLeave={() => setHoveredZoneId(null)}
                 >
-                  Конференц-зал «Сириус»
-                </text>
-              </g>
+                  <rect
+                    x="50"
+                    y="50"
+                    width="380"
+                    height="430"
+                    rx="18"
+                    fill="#1e1b4b"
+                    fillOpacity={isSiriusMatch ? 0.85 : activeZoneId === 'zone-sirius' ? 0.75 : hoveredZoneId === 'zone-sirius' ? 0.6 : 0.45}
+                    stroke={isSiriusMatch ? '#818cf8' : activeZoneId === 'zone-sirius' ? '#818cf8' : hoveredZoneId === 'zone-sirius' ? '#a5b4fc' : '#4f46e5'}
+                    strokeWidth={isSiriusMatch ? 5 : activeZoneId === 'zone-sirius' || hoveredZoneId === 'zone-sirius' ? 3.5 : 2}
+                    strokeDasharray={isSiriusMatch ? undefined : "6 3"}
+                    filter={isSiriusMatch ? 'url(#highlightGlow)' : undefined}
+                    className="transition-all duration-200"
+                  />
+                  {/* Верхняя плашка сцены */}
+                  <rect x="70" y="70" width="340" height="45" rx="8" fill="#312e81" fillOpacity="0.6" />
+                  <text x="240" y="98" textAnchor="middle" fill="#c7d2fe" fontSize="14" fontWeight="bold">
+                    СЦЕНА И ЭКРАН
+                  </text>
+                  <text
+                    x="240"
+                    y="190"
+                    textAnchor="middle"
+                    fill={isSiriusMatch || activeZoneId === 'zone-sirius' || hoveredZoneId === 'zone-sirius' ? '#ffffff' : '#c7d2fe'}
+                    fontSize="22"
+                    fontWeight="800"
+                    className="pointer-events-none"
+                  >
+                    Конференц-зал «Сириус»
+                  </text>
+                </g>
 
-              {/* 2. Прямоугольник: Кофе-брейк & Lounge (Справа, симметрично) */}
-              <g
-                className="cursor-pointer transition-all"
-                onClick={() => {
-                  const z = zones.find(z => z.id === 'zone-food');
-                  if (z) handleZoomToZone(z);
-                }}
-                onPointerEnter={() => setHoveredZoneId('zone-food')}
-                onPointerLeave={() => setHoveredZoneId(null)}
-              >
-                <rect
-                  x="770"
-                  y="50"
-                  width="380"
-                  height="430"
-                  rx="18"
-                  fill="#451a03"
-                  fillOpacity={activeZoneId === 'zone-food' ? 0.75 : hoveredZoneId === 'zone-food' ? 0.6 : 0.45}
-                  stroke={activeZoneId === 'zone-food' ? '#fbbf24' : hoveredZoneId === 'zone-food' ? '#fde68a' : '#d97706'}
-                  strokeWidth={activeZoneId === 'zone-food' || hoveredZoneId === 'zone-food' ? 3.5 : 2}
-                  strokeDasharray="6 3"
-                  className="transition-all duration-200"
-                />
-                <rect x="790" y="70" width="340" height="45" rx="8" fill="#78350f" fillOpacity="0.6" />
-                <text x="960" y="98" textAnchor="middle" fill="#fde68a" fontSize="14" fontWeight="bold">
-                  ЗОНА ОТДЫХА И КОФЕ
-                </text>
-                <text
-                  x="960"
-                  y="190"
-                  textAnchor="middle"
-                  fill={activeZoneId === 'zone-food' || hoveredZoneId === 'zone-food' ? '#ffffff' : '#fde68a'}
-                  fontSize="22"
-                  fontWeight="800"
-                  className="pointer-events-none"
+                {/* 2. Прямоугольник: Кофе-брейк & Lounge (Справа, симметрично) */}
+                <g
+                  className={`cursor-pointer transition-all duration-300 ${foodDimmed ? 'opacity-25' : 'opacity-100'}`}
+                  onClick={() => {
+                    const z = zones.find(z => z.id === 'zone-food');
+                    if (z) handleZoomToZone(z);
+                  }}
+                  onPointerEnter={() => setHoveredZoneId('zone-food')}
+                  onPointerLeave={() => setHoveredZoneId(null)}
                 >
-                  Кофе-брейк & Lounge
-                </text>
-              </g>
+                  <rect
+                    x="770"
+                    y="50"
+                    width="380"
+                    height="430"
+                    rx="18"
+                    fill="#451a03"
+                    fillOpacity={isFoodMatch ? 0.85 : activeZoneId === 'zone-food' ? 0.75 : hoveredZoneId === 'zone-food' ? 0.6 : 0.45}
+                    stroke={isFoodMatch ? '#fbbf24' : activeZoneId === 'zone-food' ? '#fbbf24' : hoveredZoneId === 'zone-food' ? '#fde68a' : '#d97706'}
+                    strokeWidth={isFoodMatch ? 5 : activeZoneId === 'zone-food' || hoveredZoneId === 'zone-food' ? 3.5 : 2}
+                    strokeDasharray={isFoodMatch ? undefined : "6 3"}
+                    filter={isFoodMatch ? 'url(#highlightGlow)' : undefined}
+                    className="transition-all duration-200"
+                  />
+                  <rect x="790" y="70" width="340" height="45" rx="8" fill="#78350f" fillOpacity="0.6" />
+                  <text x="960" y="98" textAnchor="middle" fill="#fde68a" fontSize="14" fontWeight="bold">
+                    ЗОНА ОТДЫХА И КОФЕ
+                  </text>
+                  <text
+                    x="960"
+                    y="190"
+                    textAnchor="middle"
+                    fill={isFoodMatch || activeZoneId === 'zone-food' || hoveredZoneId === 'zone-food' ? '#ffffff' : '#fde68a'}
+                    fontSize="22"
+                    fontWeight="800"
+                    className="pointer-events-none"
+                  >
+                    Кофе-брейк & Lounge
+                  </text>
+                </g>
 
-              {/* 3. Центр: Центральный стенд ТТК (Идеально отцентрован на X=600, Y=360) */}
-              <g
-                className="cursor-pointer transition-all"
-                onClick={() => {
-                  const z = zones.find(z => z.id === 'zone-ttk');
-                  if (z) handleZoomToZone(z);
-                }}
-                onPointerEnter={() => setHoveredZoneId('zone-ttk')}
-                onPointerLeave={() => setHoveredZoneId(null)}
-              >
-                <circle
-                  cx="600"
-                  cy="360"
-                  r="115"
-                  fill="#1e293b"
-                  fillOpacity={activeZoneId === 'zone-ttk' ? 0.9 : 0.75}
-                  stroke="#E30613"
-                  strokeWidth={activeZoneId === 'zone-ttk' || hoveredZoneId === 'zone-ttk' ? 4 : 2.5}
-                  strokeDasharray="8 4"
-                  className="transition-all duration-200"
-                />
-                {/* Выровненный логотип ТТК по центру (сдвинут выше, чтобы не перекрывать эмблемы) */}
-                <rect x="505" y="315" width="190" height="44" rx="10" fill="#E30613" filter="url(#dropShadow)" />
-                <text
-                  x="600"
-                  y="343"
-                  textAnchor="middle"
-                  fill="white"
-                  fontSize="16"
-                  fontWeight="900"
-                  letterSpacing="2"
-                  className="pointer-events-none"
+                {/* 3. Центр: Центральный стенд ТТК (Идеально отцентрован на X=600, Y=360) */}
+                <g
+                  className={`cursor-pointer transition-all duration-300 ${ttkDimmed ? 'opacity-25' : 'opacity-100'}`}
+                  onClick={() => {
+                    const z = zones.find(z => z.id === 'zone-ttk');
+                    if (z) handleZoomToZone(z);
+                  }}
+                  onPointerEnter={() => setHoveredZoneId('zone-ttk')}
+                  onPointerLeave={() => setHoveredZoneId(null)}
                 >
-                  ТТК ЭКСПО
-                </text>
-              </g>
+                  <circle
+                    cx="600"
+                    cy="360"
+                    r="115"
+                    fill="#1e293b"
+                    fillOpacity={isTtkMatch ? 0.95 : activeZoneId === 'zone-ttk' ? 0.9 : 0.75}
+                    stroke="#E30613"
+                    strokeWidth={isTtkMatch ? 6 : activeZoneId === 'zone-ttk' || hoveredZoneId === 'zone-ttk' ? 4 : 2.5}
+                    strokeDasharray={isTtkMatch ? undefined : "8 4"}
+                    filter={isTtkMatch ? 'url(#highlightGlow)' : undefined}
+                    className="transition-all duration-200"
+                  />
+                  {/* Выровненный логотип ТТК по центру (сдвинут выше, чтобы не перекрывать эмблемы) */}
+                  <rect x="505" y="315" width="190" height="44" rx="10" fill="#E30613" filter="url(#dropShadow)" />
+                  <text
+                    x="600"
+                    y="343"
+                    textAnchor="middle"
+                    fill="white"
+                    fontSize="16"
+                    fontWeight="900"
+                    letterSpacing="2"
+                    className="pointer-events-none"
+                  >
+                    ТТК ЭКСПО
+                  </text>
+                </g>
 
-              {/* 4. Центр: Зона Wi-Fi 6 ТТК (На центральной оси X=600, Y=540) */}
-              <g
-                className="cursor-pointer transition-all"
-                onClick={() => {
-                  const z = zones.find(z => z.id === 'zone-wifi-1');
-                  if (z) handleZoomToZone(z);
-                }}
-                onPointerEnter={() => setHoveredZoneId('zone-wifi-1')}
-                onPointerLeave={() => setHoveredZoneId(null)}
-              >
-                <circle
-                  cx="600"
-                  cy="540"
-                  r="45"
-                  fill="#0369a1"
-                  fillOpacity={activeZoneId === 'zone-wifi-1' ? 0.45 : 0.2}
-                  stroke="#38bdf8"
-                  strokeWidth={activeZoneId === 'zone-wifi-1' || hoveredZoneId === 'zone-wifi-1' ? 3 : 1.5}
-                  strokeDasharray="4 4"
-                />
-                <text x="600" y="520" textAnchor="middle" fill="#38bdf8" fontSize="11" fontWeight="bold">
-                  Wi-Fi 6 ТТК
-                </text>
-              </g>
+                {/* 4. Центр: Зона Wi-Fi 6 ТТК (На центральной оси X=600, Y=540) */}
+                <g
+                  className={`cursor-pointer transition-all duration-300 ${wifiDimmed ? 'opacity-25' : 'opacity-100'}`}
+                  onClick={() => {
+                    const z = zones.find(z => z.id === 'zone-wifi-1');
+                    if (z) handleZoomToZone(z);
+                  }}
+                  onPointerEnter={() => setHoveredZoneId('zone-wifi-1')}
+                  onPointerLeave={() => setHoveredZoneId(null)}
+                >
+                  <circle
+                    cx="600"
+                    cy="540"
+                    r="45"
+                    fill="#0369a1"
+                    fillOpacity={isWifiMatch ? 0.75 : activeZoneId === 'zone-wifi-1' ? 0.45 : 0.2}
+                    stroke="#38bdf8"
+                    strokeWidth={isWifiMatch ? 5 : activeZoneId === 'zone-wifi-1' || hoveredZoneId === 'zone-wifi-1' ? 3 : 1.5}
+                    strokeDasharray={isWifiMatch ? undefined : "4 4"}
+                    filter={isWifiMatch ? 'url(#highlightGlow)' : undefined}
+                  />
+                  <text x="600" y="520" textAnchor="middle" fill="#38bdf8" fontSize="11" fontWeight="bold">
+                    Wi-Fi 6 ТТК
+                  </text>
+                </g>
 
-              {/* 5. Внизу: Входная группа & Регистрация (Отцентрована на X=600) */}
-              <g
-                className="cursor-pointer transition-all"
-                onClick={() => {
-                  const z = zones.find(z => z.id === 'zone-entrance');
-                  if (z) handleZoomToZone(z);
-                }}
-                onPointerEnter={() => setHoveredZoneId('zone-entrance')}
-                onPointerLeave={() => setHoveredZoneId(null)}
-              >
-                <rect
-                  x="430"
-                  y="650"
-                  width="340"
-                  height="95"
-                  rx="14"
-                  fill="#064e3b"
-                  fillOpacity={activeZoneId === 'zone-entrance' ? 0.75 : hoveredZoneId === 'zone-entrance' ? 0.6 : 0.45}
-                  stroke="#10b981"
-                  strokeWidth={activeZoneId === 'zone-entrance' || hoveredZoneId === 'zone-entrance' ? 3.5 : 2}
-                  className="transition-all duration-200"
-                />
-                <text x="600" y="675" textAnchor="middle" fill="#6ee7b7" fontSize="14" fontWeight="bold">
-                  ВХОДНАЯ ГРУППА & РЕГИСТРАЦИЯ
-                </text>
-              </g>
+                {/* 5. Внизу: Входная группа & Регистрация (Отцентрована на X=600) */}
+                <g
+                  className={`cursor-pointer transition-all duration-300 ${entranceDimmed ? 'opacity-25' : 'opacity-100'}`}
+                  onClick={() => {
+                    const z = zones.find(z => z.id === 'zone-entrance');
+                    if (z) handleZoomToZone(z);
+                  }}
+                  onPointerEnter={() => setHoveredZoneId('zone-entrance')}
+                  onPointerLeave={() => setHoveredZoneId(null)}
+                >
+                  <rect
+                    x="430"
+                    y="650"
+                    width="340"
+                    height="95"
+                    rx="14"
+                    fill="#064e3b"
+                    fillOpacity={isEntranceMatch ? 0.85 : activeZoneId === 'zone-entrance' ? 0.75 : hoveredZoneId === 'zone-entrance' ? 0.6 : 0.45}
+                    stroke="#10b981"
+                    strokeWidth={isEntranceMatch ? 5 : activeZoneId === 'zone-entrance' || hoveredZoneId === 'zone-entrance' ? 3.5 : 2}
+                    filter={isEntranceMatch ? 'url(#highlightGlow)' : undefined}
+                    className="transition-all duration-200"
+                  />
+                  <text x="600" y="675" textAnchor="middle" fill="#6ee7b7" fontSize="14" fontWeight="bold">
+                    ВХОДНАЯ ГРУППА & РЕГИСТРАЦИЯ
+                  </text>
+                </g>
 
-              {/* 6. Внизу слева: Лестница на 2 этаж (Симметрично) */}
-              <g
-                className="cursor-pointer transition-all"
-                onClick={() => {
-                  const z = zones.find(z => z.id === 'zone-stairs-1');
-                  if (z) handleZoomToZone(z);
-                }}
-                onPointerEnter={() => setHoveredZoneId('zone-stairs-1')}
-                onPointerLeave={() => setHoveredZoneId(null)}
-              >
-                <rect
-                  x="60"
-                  y="600"
-                  width="340"
-                  height="145"
-                  rx="14"
-                  fill="#1e293b"
-                  stroke="#64748b"
-                  strokeWidth={activeZoneId === 'zone-stairs-1' || hoveredZoneId === 'zone-stairs-1' ? 3 : 2}
-                />
-                <line x1="100" y1="655" x2="360" y2="655" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="100" y1="680" x2="360" y2="680" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="100" y1="705" x2="360" y2="705" stroke="#94a3b8" strokeWidth="2" />
-                <text x="230" y="628" textAnchor="middle" fill="#94a3b8" fontSize="13" fontWeight="bold">
-                  Лестница на 2 этаж ▲
-                </text>
-              </g>
+                {/* 6. Внизу слева: Лестница на 2 этаж (Симметрично) */}
+                <g
+                  className={`cursor-pointer transition-all duration-300 ${stairsDimmed ? 'opacity-25' : 'opacity-100'}`}
+                  onClick={() => {
+                    const z = zones.find(z => z.id === 'zone-stairs-1');
+                    if (z) handleZoomToZone(z);
+                  }}
+                  onPointerEnter={() => setHoveredZoneId('zone-stairs-1')}
+                  onPointerLeave={() => setHoveredZoneId(null)}
+                >
+                  <rect
+                    x="60"
+                    y="600"
+                    width="340"
+                    height="145"
+                    rx="14"
+                    fill="#1e293b"
+                    stroke={isStairsMatch ? '#94a3b8' : '#64748b'}
+                    strokeWidth={isStairsMatch ? 5 : activeZoneId === 'zone-stairs-1' || hoveredZoneId === 'zone-stairs-1' ? 3 : 2}
+                    filter={isStairsMatch ? 'url(#highlightGlow)' : undefined}
+                  />
+                  <line x1="100" y1="655" x2="360" y2="655" stroke="#94a3b8" strokeWidth="2" />
+                  <line x1="100" y1="680" x2="360" y2="680" stroke="#94a3b8" strokeWidth="2" />
+                  <line x1="100" y1="705" x2="360" y2="705" stroke="#94a3b8" strokeWidth="2" />
+                  <text x="230" y="628" textAnchor="middle" fill="#94a3b8" fontSize="13" fontWeight="bold">
+                    Лестница на 2 этаж ▲
+                  </text>
+                </g>
 
-              {/* 7. Внизу справа: Санузлы WC (Симметрично) */}
-              <g
-                className="cursor-pointer transition-all"
-                onClick={() => {
-                  const z = zones.find(z => z.id === 'zone-wc-1');
-                  if (z) handleZoomToZone(z);
-                }}
-                onPointerEnter={() => setHoveredZoneId('zone-wc-1')}
-                onPointerLeave={() => setHoveredZoneId(null)}
-              >
-                <rect
-                  x="800"
-                  y="600"
-                  width="340"
-                  height="145"
-                  rx="14"
-                  fill="#083344"
-                  fillOpacity={activeZoneId === 'zone-wc-1' ? 0.8 : hoveredZoneId === 'zone-wc-1' ? 0.65 : 0.5}
-                  stroke="#0891b2"
-                  strokeWidth={activeZoneId === 'zone-wc-1' || hoveredZoneId === 'zone-wc-1' ? 3 : 2}
-                />
-                <text x="970" y="635" textAnchor="middle" fill="#67e8f9" fontSize="15" fontWeight="bold">
-                  Санузлы WC (М / Ж / МГН)
-                </text>
+                {/* 7. Внизу справа: Санузлы WC (Симметрично) */}
+                <g
+                  className={`cursor-pointer transition-all duration-300 ${wcDimmed ? 'opacity-25' : 'opacity-100'}`}
+                  onClick={() => {
+                    const z = zones.find(z => z.id === 'zone-wc-1');
+                    if (z) handleZoomToZone(z);
+                  }}
+                  onPointerEnter={() => setHoveredZoneId('zone-wc-1')}
+                  onPointerLeave={() => setHoveredZoneId(null)}
+                >
+                  <rect
+                    x="800"
+                    y="600"
+                    width="340"
+                    height="145"
+                    rx="14"
+                    fill="#083344"
+                    fillOpacity={isWcMatch ? 0.9 : activeZoneId === 'zone-wc-1' ? 0.8 : hoveredZoneId === 'zone-wc-1' ? 0.65 : 0.5}
+                    stroke={isWcMatch ? '#22d3ee' : '#0891b2'}
+                    strokeWidth={isWcMatch ? 5 : activeZoneId === 'zone-wc-1' || hoveredZoneId === 'zone-wc-1' ? 3 : 2}
+                    filter={isWcMatch ? 'url(#highlightGlow)' : undefined}
+                  />
+                  <text x="970" y="635" textAnchor="middle" fill="#67e8f9" fontSize="15" fontWeight="bold">
+                    Санузлы WC (М / Ж / МГН)
+                  </text>
+                </g>
               </g>
-            </g>
-          )}
+            );
+          })()}
 
           {/* ================= 2 ЭТАЖ ================= */}
-          {floor.level === 2 && (
-            <g id="floor-2-geometry">
-              <rect
-                x="20"
-                y="20"
-                width="1160"
-                height="760"
-                rx="20"
-                fill="#0f172a"
-                stroke="#334155"
-                strokeWidth="4"
-              />
-              <rect x="150" y="500" width="900" height="150" fill="url(#floorTile)" opacity="0.8" />
+          {floor.level === 2 && (() => {
+            const isAnyCategoryActive = selectedCategory !== 'all';
+            const isVipMatch = selectedCategory === 'sponsor';
+            const vipDimmed = isAnyCategoryActive && !isVipMatch;
 
-              {/* VIP Lounge */}
-              <g
-                className="cursor-pointer"
-                onClick={() => {
-                  const z = zones.find(z => z.id === 'zone-vip');
-                  if (z) handleZoomToZone(z);
-                }}
-                onPointerEnter={() => setHoveredZoneId('zone-vip')}
-                onPointerLeave={() => setHoveredZoneId(null)}
-              >
-                <rect
-                  x="430"
-                  y="90"
-                  width="340"
-                  height="420"
-                  rx="18"
-                  fill="#4c0519"
-                  fillOpacity={activeZoneId === 'zone-vip' ? 0.75 : hoveredZoneId === 'zone-vip' ? 0.6 : 0.45}
-                  stroke="#e11d48"
-                  strokeWidth={activeZoneId === 'zone-vip' || hoveredZoneId === 'zone-vip' ? 3.5 : 2}
-                />
-                <text x="600" y="210" textAnchor="middle" fill="#fda4af" fontSize="22" fontWeight="bold">
-                  VIP Lounge ТТК
-                </text>
-              </g>
+            const isRoomAMatch = selectedCategory === 'hall';
+            const roomADimmed = isAnyCategoryActive && !isRoomAMatch;
 
-              {/* Переговорная «Байкал» */}
-              <g
-                className="cursor-pointer"
-                onClick={() => {
-                  const z = zones.find(z => z.id === 'zone-room-a');
-                  if (z) handleZoomToZone(z);
-                }}
-                onPointerEnter={() => setHoveredZoneId('zone-room-a')}
-                onPointerLeave={() => setHoveredZoneId(null)}
-              >
-                <rect
-                  x="60"
-                  y="110"
-                  width="340"
-                  height="400"
-                  rx="18"
-                  fill="#1e293b"
-                  stroke="#6366f1"
-                  strokeWidth={activeZoneId === 'zone-room-a' || hoveredZoneId === 'zone-room-a' ? 3 : 2}
-                />
-                <text x="230" y="210" textAnchor="middle" fill="#e2e8f0" fontSize="20" fontWeight="bold">
-                  Переговорная «Байкал»
-                </text>
-              </g>
+            const isRoomBMatch = selectedCategory === 'hall';
+            const roomBDimmed = isAnyCategoryActive && !isRoomBMatch;
 
-              {/* Переговорная «Енисей» */}
-              <g
-                className="cursor-pointer"
-                onClick={() => {
-                  const z = zones.find(z => z.id === 'zone-room-b');
-                  if (z) handleZoomToZone(z);
-                }}
-                onPointerEnter={() => setHoveredZoneId('zone-room-b')}
-                onPointerLeave={() => setHoveredZoneId(null)}
-              >
-                <rect
-                  x="800"
-                  y="110"
-                  width="340"
-                  height="400"
-                  rx="18"
-                  fill="#1e293b"
-                  stroke="#6366f1"
-                  strokeWidth={activeZoneId === 'zone-room-b' || hoveredZoneId === 'zone-room-b' ? 3 : 2}
-                />
-                <text x="970" y="210" textAnchor="middle" fill="#e2e8f0" fontSize="20" fontWeight="bold">
-                  Переговорная «Енисей»
-                </text>
-              </g>
+            const isStairs2Match = selectedCategory === 'service';
+            const stairs2Dimmed = isAnyCategoryActive && !isStairs2Match;
 
-              {/* Спуск на 1 этаж */}
-              <g
-                className="cursor-pointer"
-                onClick={() => {
-                  const z = zones.find(z => z.id === 'zone-stairs-2');
-                  if (z) handleZoomToZone(z);
-                }}
-                onPointerEnter={() => setHoveredZoneId('zone-stairs-2')}
-                onPointerLeave={() => setHoveredZoneId(null)}
-              >
+            return (
+              <g id="floor-2-geometry">
                 <rect
-                  x="60"
-                  y="600"
-                  width="340"
-                  height="145"
-                  rx="14"
-                  fill="#1e293b"
-                  stroke="#64748b"
-                  strokeWidth={activeZoneId === 'zone-stairs-2' || hoveredZoneId === 'zone-stairs-2' ? 3 : 2}
+                  x="20"
+                  y="20"
+                  width="1160"
+                  height="760"
+                  rx="20"
+                  fill="#0f172a"
+                  stroke="#334155"
+                  strokeWidth="4"
                 />
-                <line x1="100" y1="655" x2="360" y2="655" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="100" y1="680" x2="360" y2="680" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="100" y1="705" x2="360" y2="705" stroke="#94a3b8" strokeWidth="2" />
-                <text x="230" y="628" textAnchor="middle" fill="#94a3b8" fontSize="13" fontWeight="bold">
-                  Спуск на 1 этаж ▼
-                </text>
+                <rect x="150" y="500" width="900" height="150" fill="url(#floorTile)" opacity="0.8" />
+
+                {/* VIP Lounge */}
+                <g
+                  className={`cursor-pointer transition-all duration-300 ${vipDimmed ? 'opacity-25' : 'opacity-100'}`}
+                  onClick={() => {
+                    const z = zones.find(z => z.id === 'zone-vip');
+                    if (z) handleZoomToZone(z);
+                  }}
+                  onPointerEnter={() => setHoveredZoneId('zone-vip')}
+                  onPointerLeave={() => setHoveredZoneId(null)}
+                >
+                  <rect
+                    x="430"
+                    y="90"
+                    width="340"
+                    height="420"
+                    rx="18"
+                    fill="#4c0519"
+                    fillOpacity={isVipMatch ? 0.9 : activeZoneId === 'zone-vip' ? 0.75 : hoveredZoneId === 'zone-vip' ? 0.6 : 0.45}
+                    stroke={isVipMatch ? '#f43f5e' : activeZoneId === 'zone-vip' || hoveredZoneId === 'zone-vip' ? '#fb7185' : '#e11d48'}
+                    strokeWidth={isVipMatch ? 5 : activeZoneId === 'zone-vip' || hoveredZoneId === 'zone-vip' ? 3.5 : 2}
+                    filter={isVipMatch ? 'url(#highlightGlow)' : undefined}
+                  />
+                  <text
+                    x="600"
+                    y="210"
+                    textAnchor="middle"
+                    fill={isVipMatch || activeZoneId === 'zone-vip' || hoveredZoneId === 'zone-vip' ? '#ffffff' : '#fda4af'}
+                    fontSize="22"
+                    fontWeight="bold"
+                  >
+                    VIP Lounge ТТК
+                  </text>
+                </g>
+
+                {/* Переговорная «Байкал» */}
+                <g
+                  className={`cursor-pointer transition-all duration-300 ${roomADimmed ? 'opacity-25' : 'opacity-100'}`}
+                  onClick={() => {
+                    const z = zones.find(z => z.id === 'zone-room-a');
+                    if (z) handleZoomToZone(z);
+                  }}
+                  onPointerEnter={() => setHoveredZoneId('zone-room-a')}
+                  onPointerLeave={() => setHoveredZoneId(null)}
+                >
+                  <rect
+                    x="60"
+                    y="110"
+                    width="340"
+                    height="400"
+                    rx="18"
+                    fill="#1e293b"
+                    stroke={isRoomAMatch ? '#818cf8' : activeZoneId === 'zone-room-a' || hoveredZoneId === 'zone-room-a' ? '#a5b4fc' : '#6366f1'}
+                    strokeWidth={isRoomAMatch ? 5 : activeZoneId === 'zone-room-a' || hoveredZoneId === 'zone-room-a' ? 3.5 : 2}
+                    filter={isRoomAMatch ? 'url(#highlightGlow)' : undefined}
+                  />
+                  <text
+                    x="230"
+                    y="210"
+                    textAnchor="middle"
+                    fill={isRoomAMatch || activeZoneId === 'zone-room-a' || hoveredZoneId === 'zone-room-a' ? '#ffffff' : '#e2e8f0'}
+                    fontSize="20"
+                    fontWeight="bold"
+                  >
+                    Переговорная «Байкал»
+                  </text>
+                </g>
+
+                {/* Переговорная «Енисей» */}
+                <g
+                  className={`cursor-pointer transition-all duration-300 ${roomBDimmed ? 'opacity-25' : 'opacity-100'}`}
+                  onClick={() => {
+                    const z = zones.find(z => z.id === 'zone-room-b');
+                    if (z) handleZoomToZone(z);
+                  }}
+                  onPointerEnter={() => setHoveredZoneId('zone-room-b')}
+                  onPointerLeave={() => setHoveredZoneId(null)}
+                >
+                  <rect
+                    x="800"
+                    y="110"
+                    width="340"
+                    height="400"
+                    rx="18"
+                    fill="#1e293b"
+                    stroke={isRoomBMatch ? '#818cf8' : activeZoneId === 'zone-room-b' || hoveredZoneId === 'zone-room-b' ? '#a5b4fc' : '#6366f1'}
+                    strokeWidth={isRoomBMatch ? 5 : activeZoneId === 'zone-room-b' || hoveredZoneId === 'zone-room-b' ? 3.5 : 2}
+                    filter={isRoomBMatch ? 'url(#highlightGlow)' : undefined}
+                  />
+                  <text
+                    x="970"
+                    y="210"
+                    textAnchor="middle"
+                    fill={isRoomBMatch || activeZoneId === 'zone-room-b' || hoveredZoneId === 'zone-room-b' ? '#ffffff' : '#e2e8f0'}
+                    fontSize="20"
+                    fontWeight="bold"
+                  >
+                    Переговорная «Енисей»
+                  </text>
+                </g>
+
+                {/* Спуск на 1 этаж */}
+                <g
+                  className={`cursor-pointer transition-all duration-300 ${stairs2Dimmed ? 'opacity-25' : 'opacity-100'}`}
+                  onClick={() => {
+                    const z = zones.find(z => z.id === 'zone-stairs-2');
+                    if (z) handleZoomToZone(z);
+                  }}
+                  onPointerEnter={() => setHoveredZoneId('zone-stairs-2')}
+                  onPointerLeave={() => setHoveredZoneId(null)}
+                >
+                  <rect
+                    x="60"
+                    y="600"
+                    width="340"
+                    height="145"
+                    rx="14"
+                    fill="#1e293b"
+                    stroke={isStairs2Match ? '#94a3b8' : '#64748b'}
+                    strokeWidth={isStairs2Match ? 5 : activeZoneId === 'zone-stairs-2' || hoveredZoneId === 'zone-stairs-2' ? 3 : 2}
+                    filter={isStairs2Match ? 'url(#highlightGlow)' : undefined}
+                  />
+                  <line x1="100" y1="655" x2="360" y2="655" stroke="#94a3b8" strokeWidth="2" />
+                  <line x1="100" y1="680" x2="360" y2="680" stroke="#94a3b8" strokeWidth="2" />
+                  <line x1="100" y1="705" x2="360" y2="705" stroke="#94a3b8" strokeWidth="2" />
+                  <text x="230" y="628" textAnchor="middle" fill="#94a3b8" fontSize="13" fontWeight="bold">
+                    Спуск на 1 этаж ▼
+                  </text>
+                </g>
               </g>
-            </g>
-          )}
+            );
+          })()}
 
           {/* ================= ЛИНИЯ МАРШРУТА ================= */}
           {routePoints.length > 1 && (

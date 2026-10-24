@@ -107,29 +107,25 @@ export default function App() {
     return counts;
   }, [activeFloor]);
 
-  // Фильтрация точек интереса
-  const filteredPois = useMemo(() => {
-    return activeFloor.points.filter(poi => {
-      const matchCategory =
-        selectedCategory === 'all' || poi.category === selectedCategory;
-      const q = searchQuery.trim().toLowerCase();
-      const matchSearch =
-        !q ||
-        poi.name.toLowerCase().includes(q) ||
-        (poi.description && poi.description.toLowerCase().includes(q)) ||
-        (poi.tags && poi.tags.some(t => t.toLowerCase().includes(q)));
-      return matchCategory && matchSearch;
-    });
-  }, [activeFloor, selectedCategory, searchQuery]);
+  // Фильтрация точек интереса для поиска
+  const searchFilteredPois = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return activeFloor.points;
+    return activeFloor.points.filter(poi =>
+      poi.name.toLowerCase().includes(q) ||
+      (poi.description && poi.description.toLowerCase().includes(q)) ||
+      (poi.tags && poi.tags.some(t => t.toLowerCase().includes(q)))
+    );
+  }, [activeFloor, searchQuery]);
 
   // Автозум к зоне при поиске: если нашли 1 уникальный результат — автоматически выбираем
   useEffect(() => {
     if (!searchQuery.trim()) return;
-    if (filteredPois.length === 1) {
+    if (searchFilteredPois.length === 1) {
       // Единственный результат — выбираем его автоматически (InteractiveMap сам зумирует)
-      setSelectedPoi(filteredPois[0]);
+      setSelectedPoi(searchFilteredPois[0]);
     }
-  }, [searchQuery, filteredPois.length]);
+  }, [searchQuery, searchFilteredPois.length]);
 
   // Построение маршрута
   const handleBuildRoute = async (target: POI) => {
@@ -210,40 +206,45 @@ export default function App() {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         isBackendConnected={isBackendConnected}
-        searchResults={filteredPois}
+        searchResults={searchFilteredPois}
         onSelectSearchResult={poi => {
           setSelectedPoi(poi);
           setSearchQuery('');
         }}
       />
 
-      {/* 2. Быстрые горизонтальные фильтры категорий (сворачиваются при зуме в помещение) */}
-      <div
-        className={`transition-all duration-300 ease-in-out overflow-hidden ${
-          activeZoneId ? 'max-h-0 opacity-0 pointer-events-none' : 'max-h-16 opacity-100'
-        }`}
-      >
-        <CategoryFilters
+      {/* 2. Область карты с плавающим вертикальным меню фильтров слева */}
+      <div className="relative flex-1 w-full h-full overflow-hidden">
+        <InteractiveMap
+          floor={activeFloor}
+          pois={activeFloor.points}
+          selectedPoi={selectedPoi}
+          onSelectPoi={poi => {
+            setSelectedPoi(poi);
+          }}
+          onClearSelectedPoi={() => setSelectedPoi(null)}
+          activeRoute={activeRoute}
+          onOpenPanorama={handleOpenPanorama}
+          activeZoneId={activeZoneId}
+          onZoneChange={setActiveZoneId}
           selectedCategory={selectedCategory}
-          onSelectCategory={setSelectedCategory}
-          categoryCounts={categoryCounts}
         />
-      </div>
 
-      {/* 3. Интерактивная 2D Карта с плавным Pan & Zoom */}
-      <InteractiveMap
-        floor={activeFloor}
-        pois={filteredPois}
-        selectedPoi={selectedPoi}
-        onSelectPoi={poi => {
-          setSelectedPoi(poi);
-        }}
-        onClearSelectedPoi={() => setSelectedPoi(null)}
-        activeRoute={activeRoute}
-        onOpenPanorama={handleOpenPanorama}
-        activeZoneId={activeZoneId}
-        onZoneChange={setActiveZoneId}
-      />
+        {/* Вертикальная менюшка категорий слева (сворачивается при зуме в помещение или маршруте) */}
+        <div
+          className={`absolute left-3 top-4 z-20 transition-all duration-300 ease-in-out ${
+            activeZoneId || activeRoute
+              ? '-translate-x-56 opacity-0 pointer-events-none'
+              : 'translate-x-0 opacity-100'
+          }`}
+        >
+          <CategoryFilters
+            selectedCategory={selectedCategory}
+            onSelectCategory={cat => setSelectedCategory(cat)}
+            categoryCounts={categoryCounts}
+          />
+        </div>
+      </div>
 
       {/* 4. Шторка информации о выбранной точке (Bottom Sheet) */}
       {selectedPoi && !activeRoute && (
