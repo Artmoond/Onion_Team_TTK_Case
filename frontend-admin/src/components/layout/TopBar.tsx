@@ -1,0 +1,145 @@
+import {
+  Cloud,
+  CloudOff,
+  FilePlus2,
+  FolderOpen,
+  Layers,
+  QrCode,
+  Redo2,
+  Save,
+  Undo2,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { checkBackend } from '../../services/api';
+import { persistCurrentDraft, useEditorStore } from '../../store/editorStore';
+import { useActiveFloor } from '../../store/editorStore';
+
+interface TopBarProps {
+  onOpenBackend: () => void;
+  onOpenPublish: () => void;
+  onNewProject: () => void;
+}
+
+export function TopBar({ onOpenBackend, onOpenPublish, onNewProject }: TopBarProps) {
+  const venue = useEditorStore((state) => state.venue);
+  const activeFloor = useActiveFloor();
+  const dirty = useEditorStore((state) => state.dirty);
+  const saveStatus = useEditorStore((state) => state.saveStatus);
+  const lastSavedAt = useEditorStore((state) => state.lastSavedAt);
+  const canUndo = useEditorStore((state) => state.history.past.length > 0);
+  const canRedo = useEditorStore((state) => state.history.future.length > 0);
+  const undo = useEditorStore((state) => state.undo);
+  const redo = useEditorStore((state) => state.redo);
+  const setActiveFloor = useEditorStore((state) => state.setActiveFloor);
+  const markSavedLocal = useEditorStore((state) => state.markSavedLocal);
+  const showToast = useEditorStore((state) => state.showToast);
+  const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    checkBackend()
+      .then(() => {
+        if (!cancelled) setBackendOnline(true);
+      })
+      .catch(() => {
+        if (!cancelled) setBackendOnline(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!venue) return null;
+
+  const saveLocal = () => {
+    const draft = persistCurrentDraft();
+    if (!draft) return;
+    markSavedLocal();
+    showToast('success', 'Черновик сохранён', 'Данные сохранены в localStorage браузера.');
+  };
+
+  const statusText =
+    saveStatus === 'saved-server'
+      ? 'Опубликовано на backend'
+      : saveStatus === 'saved-local'
+        ? 'Сохранено локально'
+        : saveStatus === 'saving'
+          ? 'Сохранение…'
+          : saveStatus === 'error'
+            ? 'Ошибка сохранения'
+            : dirty
+              ? 'Есть изменения'
+              : 'Без изменений';
+
+  return (
+    <header className="z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900 px-4">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="rounded bg-brand px-2.5 py-1 text-xs font-black tracking-wider text-white">ТТК</span>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-bold text-white">{venue.title}</div>
+          <div className="truncate font-mono text-[10px] text-slate-500">/m/{venue.slug}</div>
+        </div>
+      </div>
+
+      <div className="mx-2 h-8 w-px bg-slate-800" />
+
+      <div className="flex items-center gap-2">
+        <Layers className="h-4 w-4 text-slate-500" />
+        <select
+          className="field w-52 py-1"
+          value={activeFloor?.id ?? ''}
+          onChange={(event) => setActiveFloor(event.target.value)}
+        >
+          {venue.floors.map((floor) => (
+            <option key={floor.id} value={floor.id}>
+              {floor.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="ml-auto flex items-center gap-1.5">
+        <button className="btn px-2" onClick={undo} disabled={!canUndo} title="Отменить (Ctrl+Z)">
+          <Undo2 className="h-4 w-4" />
+        </button>
+        <button className="btn px-2" onClick={redo} disabled={!canRedo} title="Повторить (Ctrl+Shift+Z)">
+          <Redo2 className="h-4 w-4" />
+        </button>
+
+        <div
+          className={`hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold xl:flex ${
+            backendOnline ? 'border-emerald-800/60 bg-emerald-950/40 text-emerald-300' : 'border-amber-800/60 bg-amber-950/30 text-amber-300'
+          }`}
+          title={backendOnline ? 'Backend /api/health отвечает' : 'Backend недоступен — доступен локальный режим'}
+        >
+          {backendOnline ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
+          {backendOnline ? 'Backend онлайн' : 'Локальный режим'}
+        </div>
+
+        <div className="mr-1 hidden flex-col items-end xl:flex">
+          <span className={`text-[10px] font-semibold ${saveStatus === 'error' ? 'text-red-400' : dirty ? 'text-amber-300' : 'text-slate-400'}`}>
+            {statusText}
+          </span>
+          {lastSavedAt && (
+            <span className="text-[9px] text-slate-600">
+              {new Date(lastSavedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          )}
+        </div>
+
+        <button className="btn" onClick={saveLocal} title="Сохранить локальный черновик">
+          <Save className="h-4 w-4" /> <span className="hidden 2xl:inline">Сохранить</span>
+        </button>
+        <button className="btn" onClick={onOpenBackend} title="Открыть карту с сервера">
+          <FolderOpen className="h-4 w-4" /> <span className="hidden 2xl:inline">С сервера</span>
+        </button>
+        <button className="btn px-2" onClick={onNewProject} title="Новый проект">
+          <FilePlus2 className="h-4 w-4" />
+        </button>
+        <button className="btn-primary" onClick={onOpenPublish}>
+          <QrCode className="h-4 w-4" /> Опубликовать
+        </button>
+      </div>
+    </header>
+  );
+}

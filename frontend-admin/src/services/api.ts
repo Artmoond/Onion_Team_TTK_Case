@@ -1,0 +1,106 @@
+import type { Venue } from '../types/venue';
+
+const DEFAULT_API_BASE = 'http://localhost:8000';
+
+export const API_BASE = (import.meta.env.VITE_API_URL || DEFAULT_API_BASE).replace(/\/+$/, '');
+
+export class ApiError extends Error {
+  constructor(message: string, public readonly status?: number) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+function mediaUrl(path: string): string {
+  if (!path) return path;
+  if (path.startsWith('local-asset://')) return path;
+  try {
+    const parsed = new URL(path, `${API_BASE}/`);
+    const apiOrigin = new URL(API_BASE).origin;
+    if (parsed.origin !== apiOrigin || !parsed.pathname.startsWith('/uploads/') || parsed.username || parsed.password) {
+      throw new Error('invalid upload url');
+    }
+    return parsed.toString();
+  } catch {
+    throw new ApiError('Сервер вернул недопустимый адрес загруженного файла.');
+  }
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  let response: Response;
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), 30_000);
+  const abortFromCaller = () => controller.abort();
+  init?.signal?.addEventListener('abort', abortFromCaller, { once: true });
+  try {
+    response = await fetch(`${API_BASE}${path}`, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new ApiError('Запрос к серверу отменён или превысил лимит времени.');
+    throw new ApiError(`Сервер недоступен по адресу ${API_BASE}. Используйте локальный режим или запустите сервер.`);
+  } finally {
+    globalThis.clearTimeout(timeout);
+    init?.signal?.removeEventListener('abort', abortFromCaller);
+  }
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new ApiError(`Запрос ${path} завершился с ошибкой ${response.status}${text ? `: ${text.slice(0, 240)}` : ''}.`, response.status);
+  }
+  return (await response.json()) as T;
+}
+
+export async function checkBackend(): Promise<{ status: string; service: string; venues_count: number }> {
+  return request('/api/health');
+}
+
+export async function listVenues(): Promise<Venue[]> {
+  return request('/api/venues');
+}
+
+export async function fetchVenue(slug: string): Promise<Venue> {
+  return request(`/api/public/${encodeURIComponent(slug)}`);
+}
+
+export async function saveVenue(venue: Venue): Promise<{ status: string; slug: string }> {
+  return request(`/api/venues/${encodeURIComponent(venue.slug)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(venue),
+  });
+}
+
+export async function uploadAsset(file: Blob, fileName: string): Promise<{ url: string; size: number }> {
+  const form = new FormData();
+  form.append('file', file, fileName);
+  const result = await request<{ url: string; size: number }>('/api/upload', {
+    method: 'POST',
+    body: form,
+  });
+  return { ...result, url: mediaUrl(result.url) };
+}
+
+export function buildPublicUrl(venue: Venue, override?: string): {
+  url: string;
+  source: 'backend' | 'manual' | 'test';
+} {
+  const validPublicUrl = (value?: string): string | null => {
+    if (!value?.trim()) return null;
+    try {
+      const parsed = new URL(value.trim());
+      if ((parsed.protocol !== 'http:' && parsed.protocol !== 'https:') || parsed.username || parsed.password) return null;
+      return parsed.toString();
+    } catch {
+      return null;
+    }
+  };
+  const backendUrl = validPublicUrl(venue.publicUrl);
+  if (backendUrl) {
+    return { url: backendUrl, source: 'backend' };
+  }
+  const manualUrl = validPublicUrl(override);
+  if (manualUrl) {
+    return { url: manualUrl, source: 'manual' };
+  }
+  const configuredBase = validPublicUrl(import.meta.env.VITE_PUBLIC_MAP_BASE_URL);
+  const base = (configuredBase ?? 'http://localhost:3000').replace(/\/+$/, '');
+  return { url: `${base}/m/${venue.slug}`, source: 'test' };
+}
