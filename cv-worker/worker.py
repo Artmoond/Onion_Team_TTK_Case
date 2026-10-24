@@ -704,7 +704,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         level=os.getenv("CV_LOG_LEVEL", "INFO"),
         format="%(asctime)s %(levelname)s %(message)s",
     )
-    args = build_parser().parse_args(argv)
+    # В контейнере воркер может запускаться без аргументов (старый CMD образа).
+    # По умолчанию включаем режим наблюдения, чтобы не падать с кодом 2.
+    effective_argv = list(sys.argv[1:] if argv is None else argv)
+    if not effective_argv:
+        effective_argv = ["watch"]
+    args = build_parser().parse_args(effective_argv)
 
     if args.command == "compress":
         args.output_dir.mkdir(parents=True, exist_ok=True)

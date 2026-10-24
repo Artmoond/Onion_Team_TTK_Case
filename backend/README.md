@@ -43,8 +43,8 @@
 | `TTK_JWT_SECRET` | dev-значение | секрет подписи JWT (сменить в проде) |
 | `TTK_AUTH_DB` | `/app/data/auth.db` | путь к SQLite |
 | `TTK_ADMIN_INVITE_CODE` | `TTK-ADMIN-2026` | код регистрации организатора |
-| `TTK_ADMIN_EMAIL` / `TTK_ADMIN_PASSWORD` | `admin@ttk.local` / `Admin12345!` | демо-админ |
-| `TTK_USER_EMAIL` / `TTK_USER_PASSWORD` | `user@ttk.local` / `User12345!` | демо-посетитель |
+| `TTK_ADMIN_EMAIL` / `TTK_ADMIN_PASSWORD` | `admin@ttk.example.com` / `Admin12345!` | демо-админ |
+| `TTK_USER_EMAIL` / `TTK_USER_PASSWORD` | `user@ttk.example.com` / `User12345!` | демо-посетитель |
 | `TTK_ACCESS_TOKEN_TTL` | `1800` | срок access-токена, секунды |
 | `TTK_REFRESH_TOKEN_TTL` | `604800` | срок refresh-токена, секунды |
 | `TTK_LOGIN_MAX_ATTEMPTS` | `5` | попыток до блокировки аккаунта |

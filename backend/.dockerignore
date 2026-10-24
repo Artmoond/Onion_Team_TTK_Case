@@ -5,3 +5,10 @@ __pycache__
 .pytest_cache
 .vscode
 .git
+.env
+.env.*
+# Локальная база авторизации не должна попадать в образ
+data
+*.db
+*.db-shm
+*.db-wal

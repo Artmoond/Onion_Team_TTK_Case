@@ -70,7 +70,7 @@ SEED_DEMO_USERS = os.getenv("TTK_SEED_DEMO_USERS", "true").strip().lower() in {
     "yes",
     "on",
 }
-SEED_ADMIN_EMAIL = os.getenv("TTK_ADMIN_EMAIL", "admin@ttk.local")
+SEED_ADMIN_EMAIL = os.getenv("TTK_ADMIN_EMAIL", "admin@ttk.example.com")
 SEED_ADMIN_PASSWORD = os.getenv("TTK_ADMIN_PASSWORD", "Admin12345!")
-SEED_USER_EMAIL = os.getenv("TTK_USER_EMAIL", "user@ttk.local")
+SEED_USER_EMAIL = os.getenv("TTK_USER_EMAIL", "user@ttk.example.com")
 SEED_USER_PASSWORD = os.getenv("TTK_USER_PASSWORD", "User12345!")

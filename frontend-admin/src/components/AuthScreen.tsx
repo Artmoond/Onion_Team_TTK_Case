@@ -30,8 +30,8 @@ interface AuthScreenProps {
 }
 
 const DEMO = {
-  admin: { email: 'admin@ttk.local', password: 'Admin12345!' },
-  user: { email: 'user@ttk.local', password: 'User12345!' },
+  admin: { email: 'admin@ttk.example.com', password: 'Admin12345!' },
+  user: { email: 'user@ttk.example.com', password: 'User12345!' },
 };
 
 export default function AuthScreen({ mode, alternateUrl, onAuthenticated }: AuthScreenProps) {

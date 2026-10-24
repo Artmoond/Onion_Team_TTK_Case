@@ -40,8 +40,8 @@
 
 | Роль | Email | Пароль |
 | :--- | :--- | :--- |
-| Организатор | `admin@ttk.local` | `Admin12345!` |
-| Посетитель | `user@ttk.local` | `User12345!` |
+| Организатор | `admin@ttk.example.com` | `Admin12345!` |
+| Посетитель | `user@ttk.example.com` | `User12345!` |
 
 > Для боевого запуска обязательно задайте свои `TTK_ADMIN_PASSWORD`, `TTK_USER_PASSWORD`, `TTK_ADMIN_INVITE_CODE` и `TTK_JWT_SECRET`.
 
@@ -70,7 +70,7 @@
 ```bash
 curl -X POST http://localhost:8000/api/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"email":"admin@ttk.local","password":"Admin12345!","role":"admin"}'
+  -d '{"email":"admin@ttk.example.com","password":"Admin12345!","role":"admin"}'
 ```
 
 Ответ содержит `accessToken`, `refreshToken` и `user`. Защищённые запросы — с заголовком `Authorization: Bearer <accessToken>`.
@@ -91,6 +91,27 @@ curl -X POST http://localhost:8000/api/auth/login \
 - SQL-запросы параметризованы, имена загружаемых файлов и папок санитизируются, path traversal заблокирован.
 
 Все параметры можно переопределить переменными окружения — они перечислены в `docker-compose.yml` и `backend/app/auth/config.py`.
+
+### Fedora / SELinux
+
+Если контейнер падает с `Permission denied` на `package.json`, `main.py` или `/app/uploads`, это SELinux: bind mount из домашней папки не имеет метки `container_file_t`. В `docker-compose.yml` все такие тома уже помечены `:z`, поэтому достаточно пересоздать контейнеры:
+
+```bash
+sudo docker compose down --remove-orphans
+sudo ./start.sh
+```
+
+Если контейнеры уже запущены и пересоздавать их не хочется, можно переразметить папки вручную:
+
+```bash
+sudo chcon -R -t container_file_t backend shared data frontend-client frontend-admin cv-worker
+```
+
+Проверить, что метки применились:
+
+```bash
+ls -Zd backend data frontend-client frontend-admin
+```
 
 ---
 
