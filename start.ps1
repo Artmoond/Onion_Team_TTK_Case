@@ -1,4 +1,6 @@
-# Скрипт запуска всего проекта ТТК через WSL Docker Compose
+﻿[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 Write-Host "Запуск всех сервисов ТТК через WSL Docker Compose..." -ForegroundColor Cyan
 
 # Преобразуем текущий Windows путь в формат WSL
