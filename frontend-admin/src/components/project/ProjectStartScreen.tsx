@@ -1,4 +1,4 @@
-import { FolderOpen, Map, Plus, RotateCcw } from 'lucide-react';
+import { FolderOpen, LogOut, Map, Plus, RotateCcw } from 'lucide-react';
 import { useState } from 'react';
 import { loadDraft } from '../../services/storage';
 import { useEditorStore } from '../../store/editorStore';
@@ -8,9 +8,10 @@ import { BackendVenuesModal } from './BackendVenuesModal';
 
 interface ProjectStartScreenProps {
   onQrUnavailable?: () => void;
+  onLogout?: () => void;
 }
 
-export function ProjectStartScreen(_props: ProjectStartScreenProps) {
+export function ProjectStartScreen({ onLogout }: ProjectStartScreenProps) {
   const createProject = useEditorStore((state) => state.createProject);
   const loadProject = useEditorStore((state) => state.loadProject);
   const showToast = useEditorStore((state) => state.showToast);
@@ -40,6 +41,11 @@ export function ProjectStartScreen(_props: ProjectStartScreenProps) {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-6 py-10">
+      {onLogout && (
+        <button className="btn absolute right-5 top-5" onClick={onLogout}>
+          <LogOut className="h-4 w-4" /> Выйти
+        </button>
+      )}
       <div className="pointer-events-none absolute -left-32 top-0 h-96 w-96 rounded-full bg-brand/20 blur-3xl" />
       <div className="pointer-events-none absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl" />
       <div className="relative grid w-full max-w-5xl gap-8 lg:grid-cols-[1.1fr_0.9fr]">

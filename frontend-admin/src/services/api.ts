@@ -33,7 +33,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const abortFromCaller = () => controller.abort();
   init?.signal?.addEventListener('abort', abortFromCaller, { once: true });
   try {
-    response = await fetch(`${API_BASE}${path}`, { ...init, signal: controller.signal });
+    response = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      credentials: 'include',
+      signal: controller.signal,
+    });
   } catch (error) {
     if (controller.signal.aborted) throw new ApiError('Запрос к серверу отменён или превысил лимит времени.');
     throw new ApiError(`Сервер недоступен по адресу ${API_BASE}. Используйте локальный режим или запустите сервер.`);

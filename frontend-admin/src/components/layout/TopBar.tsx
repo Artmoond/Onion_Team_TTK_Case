@@ -4,6 +4,7 @@ import {
   FilePlus2,
   FolderOpen,
   Layers,
+  LogOut,
   QrCode,
   Redo2,
   Save,
@@ -18,9 +19,10 @@ interface TopBarProps {
   onOpenBackend: () => void;
   onOpenPublish: () => void;
   onNewProject: () => void;
+  onLogout: () => void;
 }
 
-export function TopBar({ onOpenBackend, onOpenPublish, onNewProject }: TopBarProps) {
+export function TopBar({ onOpenBackend, onOpenPublish, onNewProject, onLogout }: TopBarProps) {
   const venue = useEditorStore((state) => state.venue);
   const activeFloor = useActiveFloor();
   const dirty = useEditorStore((state) => state.dirty);
@@ -138,6 +140,9 @@ export function TopBar({ onOpenBackend, onOpenPublish, onNewProject }: TopBarPro
         </button>
         <button className="btn-primary" onClick={onOpenPublish}>
           <QrCode className="h-4 w-4" /> Опубликовать
+        </button>
+        <button className="btn px-2" onClick={onLogout} title="Выйти из аккаунта" aria-label="Выйти из аккаунта">
+          <LogOut className="h-4 w-4" />
         </button>
       </div>
     </header>

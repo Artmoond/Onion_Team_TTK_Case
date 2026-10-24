@@ -59,7 +59,7 @@ interface EditorState {
   createProject: (title: string, slug: string, description?: string) => void;
   loadProject: (venue: Venue) => void;
   setVenueAfterSync: (venue: Venue) => void;
-  clearProject: () => void;
+  clearProject: (preserveDraft?: boolean) => void;
   updateProjectMeta: (patch: Partial<Pick<Venue, 'title' | 'slug' | 'description' | 'coverUrl' | 'publicUrl'>>, record?: boolean) => void;
 
   setActiveFloor: (floorId: string) => void;
@@ -271,8 +271,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  clearProject: () => {
-    clearDraft();
+  clearProject: (preserveDraft = false) => {
+    if (!preserveDraft) clearDraft();
     set({
       venue: null,
       activeFloorId: null,

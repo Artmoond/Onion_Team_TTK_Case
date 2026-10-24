@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
+import { AuthScreen } from './components/auth/AuthScreen';
 import { FloorTabs } from './components/floors/FloorTabs';
 import { ConfirmDialog } from './components/layout/ConfirmDialog';
 import { PropertiesPanel } from './components/layout/PropertiesPanel';
@@ -8,11 +9,16 @@ import { TopBar } from './components/layout/TopBar';
 import { BackendVenuesModal } from './components/project/BackendVenuesModal';
 import { ProjectStartScreen } from './components/project/ProjectStartScreen';
 import { PublishQrModal } from './components/publish/PublishQrModal';
+import { AuthError, getCurrentUser, logoutOrganizer, type AuthUser } from './services/auth';
 import { persistCurrentDraft, useActiveFloor, useEditorStore } from './store/editorStore';
 
 const EditorCanvas = lazy(() => import('./components/editor/EditorCanvas').then((module) => ({ default: module.EditorCanvas })));
 
 export default function App() {
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authChecking, setAuthChecking] = useState(true);
+  const [authServiceUnavailable, setAuthServiceUnavailable] = useState<string | null>(null);
+  const showToast = useEditorStore((state) => state.showToast);
   const venue = useEditorStore((state) => state.venue);
   const activeFloor = useActiveFloor();
   const activeFloorId = useEditorStore((state) => state.activeFloorId);
@@ -22,17 +28,51 @@ export default function App() {
   const [backendOpen, setBackendOpen] = useState(false);
   const [publishOpen, setPublishOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   useEffect(() => {
-    if (!venue) return;
+    let active = true;
+    getCurrentUser()
+      .then((user) => {
+        if (!active) return;
+        setAuthUser(user);
+        setAuthServiceUnavailable(null);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        const message = error instanceof AuthError && error.status === 404
+          ? 'Сервис авторизации ещё не подключён на backend. Вход и регистрация станут доступны после реализации API.'
+          : 'Не удалось проверить сессию. Убедитесь, что backend авторизации доступен.';
+        setAuthServiceUnavailable(message);
+      })
+      .finally(() => {
+        if (active) setAuthChecking(false);
+      });
+    return () => { active = false; };
+  }, []);
+
+  const signOut = async () => {
+    setAuthUser(null);
+    clearProject(true);
+    try {
+      await logoutOrganizer();
+    } catch (error) {
+      showToast('error', 'Не удалось завершить сессию на сервере', error instanceof Error ? error.message : 'При следующем открытии аккаунт может войти автоматически.');
+      return;
+    }
+    showToast('info', 'Вы вышли из аккаунта');
+  };
+
+  useEffect(() => {
+    if (!venue || !authUser) return;
     const timer = window.setTimeout(() => {
       persistCurrentDraft();
     }, 600);
     return () => window.clearTimeout(timer);
-  }, [venue, activeFloorId, settings]);
+  }, [venue, activeFloorId, settings, authUser]);
 
   useEffect(() => {
-    if (!venue) return;
+    if (!venue || !authUser) return;
     const handler = (event: BeforeUnloadEvent) => {
       if (!dirty) return;
       event.preventDefault();
@@ -40,12 +80,25 @@ export default function App() {
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [dirty, venue]);
+  }, [dirty, venue, authUser]);
+
+  if (authChecking) {
+    return <div className="grid min-h-screen place-items-center bg-slate-950 text-sm text-slate-400">Проверяем авторизацию…</div>;
+  }
+
+  if (!authUser) {
+    return (
+      <>
+        <AuthScreen onAuthenticated={(user) => { setAuthServiceUnavailable(null); setAuthUser(user); }} serviceUnavailable={authServiceUnavailable} />
+        <ToastView />
+      </>
+    );
+  }
 
   if (!venue) {
     return (
       <>
-        <ProjectStartScreen />
+        <ProjectStartScreen onLogout={() => { void signOut(); }} />
         <ToastView />
       </>
     );
@@ -59,6 +112,7 @@ export default function App() {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
       <TopBar
+        onLogout={() => setLogoutConfirmOpen(true)}
         onOpenBackend={() => setBackendOpen(true)}
         onOpenPublish={() => setPublishOpen(true)}
         onNewProject={() => setNewProjectOpen(true)}
@@ -97,6 +151,20 @@ export default function App() {
         onConfirm={() => {
           setNewProjectOpen(false);
           clearProject();
+        }}
+      />
+
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Выйти из аккаунта?"
+        text={dirty
+          ? 'Есть несохранённые изменения. Черновик сохраняется автоматически в этом браузере.'
+          : 'Для продолжения работы потребуется войти снова.'}
+        confirmLabel="Выйти"
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={() => {
+          setLogoutConfirmOpen(false);
+          void signOut();
         }}
       />
 
