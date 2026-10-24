@@ -1,0 +1,16 @@
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.vscode
+.git
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+tests/
+requirements-dev.txt
+*.webp
+*.json
+!requirements*.txt
