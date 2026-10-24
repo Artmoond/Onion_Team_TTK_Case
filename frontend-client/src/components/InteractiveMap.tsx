@@ -1055,6 +1055,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 transform={`translate(${pano.x}, ${pano.y})`}
                 onClick={e => {
                   e.stopPropagation();
+                  setHoveredItemId(null);
                   onOpenPanorama(pano.id);
                 }}
                 onPointerEnter={() => setHoveredItemId(pano.id)}
@@ -1108,7 +1109,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           {visiblePois.map(poi => {
             const isSelected = selectedPoi?.id === poi.id;
             const isHovered = hoveredItemId === poi.id;
-            const showTooltip = isHovered || isSelected;
+            // Тултип «Нажмите для карточки» показывается ТОЛЬКО при наведении и скрывается сразу после клика (когда открыта карточка)
+            const showTooltip = isHovered && !selectedPoi;
             const details = getCategoryDetails(poi.category);
             const Icon = details.icon;
 
@@ -1118,6 +1120,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 transform={`translate(${poi.x}, ${poi.y})`}
                 onClick={e => {
                   e.stopPropagation();
+                  setHoveredItemId(null);
                   onSelectPoi(poi);
                 }}
                 onPointerEnter={() => setHoveredItemId(poi.id)}
@@ -1125,7 +1128,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 className="interactive-pin cursor-pointer transition-all duration-200"
                 style={{
                   transform: `translate(${poi.x}px, ${poi.y}px) ${
-                    isSelected || isHovered ? 'scale(1.4)' : 'scale(1)'
+                    isSelected || isHovered ? 'scale(1.3)' : 'scale(1)'
                   }`,
                 }}
               >
