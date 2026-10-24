@@ -15,6 +15,8 @@ services:
       - ./data/uploads:/app/uploads
     environment:
       - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - PUBLIC_MAP_BASE_URL=${PUBLIC_MAP_BASE_URL:-http://localhost:3000}
     restart: unless-stopped
 
   # Мобильный веб-клиент посетителя (Участник №1)

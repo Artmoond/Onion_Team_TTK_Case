@@ -15,7 +15,7 @@ import type {
   Wall,
 } from '../types/venue';
 import { createEmptyFloor, createEmptyVenue } from '../services/serialization';
-import { clearDraft, DEFAULT_SETTINGS, loadDraft, saveDraft, type SavedDraft } from '../services/storage';
+import { clearDraft, DEFAULT_SETTINGS, saveDraft, type SavedDraft } from '../services/storage';
 import { createId } from '../utils/id';
 import { wallLength } from '../utils/geometry';
 
@@ -205,12 +205,13 @@ function reconcileSelection(
 }
 
 function initialDraft() {
-  const draft = loadDraft();
   return {
-    venue: draft?.venue ?? null,
-    activeFloorId: draft?.activeFloorId ?? null,
-    settings: draft?.settings ?? DEFAULT_SETTINGS,
-    lastSavedAt: draft?.savedAt ?? null,
+    // Черновик можно восстановить вручную с экрана старта, но не открывать
+    // автоматически: новая сессия редактора должна начинаться пустой.
+    venue: null,
+    activeFloorId: null,
+    settings: DEFAULT_SETTINGS,
+    lastSavedAt: null,
     dirty: false,
   };
 }

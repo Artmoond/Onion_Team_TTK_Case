@@ -26,6 +26,7 @@ app.add_middleware(
 
 UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+PUBLIC_MAP_BASE_URL = (os.getenv("PUBLIC_MAP_BASE_URL") or "http://localhost:3000").rstrip("/")
 
 # Монтируем папку с загрузками для раздачи файлов (планы, панорамы)
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -61,9 +62,6 @@ def healthcheck():
 def get_public_venue(slug: str):
     venue = local_venues_db.get(slug)
     if not venue:
-        # Если не найден точный slug, вернем первый доступный для удобства демо
-        if local_venues_db:
-            return next(iter(local_venues_db.values()))
         raise HTTPException(status_code=404, detail="Площадка не найдена")
     return venue
 
@@ -71,7 +69,7 @@ def get_public_venue(slug: str):
 def build_route(slug: str, req: RouteRequestModel):
     venue = local_venues_db.get(slug)
     if not venue:
-        venue = next(iter(local_venues_db.values()), None)
+        raise HTTPException(status_code=404, detail="Площадка не найдена")
     if not venue or not venue.get("floors"):
         raise HTTPException(status_code=404, detail="Данные этажа отсутствуют")
 
@@ -106,8 +104,13 @@ def list_venues():
 
 @app.put("/api/venues/{slug}")
 def save_venue(slug: str, updated_venue: Dict[str, Any]):
+    if updated_venue.get("slug") != slug:
+        raise HTTPException(status_code=400, detail="Slug в URL и JSON не совпадает")
+    # Создаём публичный URL только при успешном сохранении опубликованной карты.
+    public_url = f"{PUBLIC_MAP_BASE_URL}/m/{slug}"
+    updated_venue["publicUrl"] = public_url
     local_venues_db[slug] = updated_venue
-    return {"status": "saved", "slug": slug}
+    return {"status": "saved", "slug": slug, "publicUrl": public_url}
 
 @app.post("/api/upload")
 async def upload_file(file: UploadFile = File(...)):

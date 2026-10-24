@@ -131,7 +131,21 @@ export async function publishVenue(
 
   onProgress?.({ done, total, label: 'Сохранение данных карты' });
   const payload = JSON.parse(serializeVenue(next)) as Venue;
-  await saveVenue(payload);
+  delete payload.publicUrl;
+  const saved = await saveVenue(payload);
+  if (saved.status !== 'saved' || saved.slug !== payload.slug || typeof saved.publicUrl !== 'string') {
+    throw new Error('Backend сохранил карту, но не вернул публичную ссылку. Повторите публикацию или проверьте API.');
+  }
+  let publicUrl: URL;
+  try {
+    publicUrl = new URL(saved.publicUrl);
+  } catch {
+    throw new Error('Backend вернул некорректную публичную ссылку.');
+  }
+  if (publicUrl.protocol !== 'http:' && publicUrl.protocol !== 'https:') {
+    throw new Error('Backend вернул ссылку с неподдерживаемым протоколом.');
+  }
+  payload.publicUrl = saved.publicUrl;
   onProgress?.({ done: total, total, label: 'Готово' });
 
   return { venue: payload, uploaded: refs.length };

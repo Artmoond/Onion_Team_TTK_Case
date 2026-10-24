@@ -56,7 +56,11 @@ describe('publish assets', () => {
         });
       }
       if (url.includes('/api/venues/')) {
-        return new Response(JSON.stringify({ status: 'ok', slug: demoVenue.slug }), {
+        return new Response(JSON.stringify({
+          status: 'saved',
+          slug: demoVenue.slug,
+          publicUrl: `http://localhost:3000/m/${demoVenue.slug}`,
+        }), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         });
