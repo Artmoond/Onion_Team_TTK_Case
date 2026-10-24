@@ -9,7 +9,6 @@ import { PoiSheet } from './components/PoiSheet';
 import { RouteDrawer } from './components/RouteDrawer';
 import { PanoModal } from './components/PanoModal';
 import { VirtualWalkModal } from './components/VirtualWalkModal';
-import { OnboardingHint } from './components/OnboardingHint';
 
 export default function App() {
   const [venue, setVenue] = useState<Venue>(mockVenue);
@@ -232,23 +231,19 @@ export default function App() {
       </div>
 
       {/* 3. Интерактивная 2D Карта с плавным Pan & Zoom */}
-      <div className="relative flex-1 w-full overflow-hidden">
-        <InteractiveMap
-          floor={activeFloor}
-          pois={filteredPois}
-          selectedPoi={selectedPoi}
-          onSelectPoi={poi => {
-            setSelectedPoi(poi);
-          }}
-          onClearSelectedPoi={() => setSelectedPoi(null)}
-          activeRoute={activeRoute}
-          onOpenPanorama={handleOpenPanorama}
-          activeZoneId={activeZoneId}
-          onZoneChange={setActiveZoneId}
-        />
-        {/* Онбординг-подсказка при первом открытии */}
-        <OnboardingHint activeZoneId={activeZoneId} />
-      </div>
+      <InteractiveMap
+        floor={activeFloor}
+        pois={filteredPois}
+        selectedPoi={selectedPoi}
+        onSelectPoi={poi => {
+          setSelectedPoi(poi);
+        }}
+        onClearSelectedPoi={() => setSelectedPoi(null)}
+        activeRoute={activeRoute}
+        onOpenPanorama={handleOpenPanorama}
+        activeZoneId={activeZoneId}
+        onZoneChange={setActiveZoneId}
+      />
 
       {/* 4. Шторка информации о выбранной точке (Bottom Sheet) */}
       {selectedPoi && !activeRoute && (

@@ -39,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   const showDropdown = searchQuery.trim().length > 0 && searchResults.length > 0;
 
   return (
-    <header className="flex flex-col bg-slate-900/95 backdrop-blur-md border-b border-slate-800 z-30 shadow-lg">
+    <header className="relative z-50 flex flex-col bg-slate-900/95 backdrop-blur-md border-b border-slate-800 shadow-lg">
       {/* Верхняя строка с логотипом ТТК и селектором этажа */}
       <div className="flex items-center justify-between px-3 py-2.5">
         <div className="flex items-center gap-2">

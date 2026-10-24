@@ -472,15 +472,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       {activeZoneId && (
         <button
           onClick={handleResetView}
-          className="absolute top-4 left-3 z-30 flex items-center gap-2 bg-slate-900/95 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl border border-slate-700/80 shadow-2xl backdrop-blur-md active:scale-95 transition-all animate-in fade-in"
+          className="absolute top-4 left-3 z-10 flex items-center gap-2 bg-slate-900/95 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl border border-slate-700/80 shadow-2xl backdrop-blur-md active:scale-95 transition-all animate-in fade-in"
         >
           <ArrowLeft className="w-4 h-4 text-[#E30613]" />
-          <span>← Вся карта (100%)</span>
+          <span>Вся карта</span>
         </button>
       )}
 
       {/* Кнопки управления зумом */}
-      <div className="absolute top-4 right-3 z-20 flex flex-col items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/60 shadow-xl">
+      <div className="absolute top-4 right-3 z-10 flex flex-col items-center gap-1.5 bg-slate-900/90 backdrop-blur-md p-1.5 rounded-2xl border border-slate-700/60 shadow-xl">
         <button
           onClick={() => handleZoom(0.25)}
           className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors active:scale-90"
@@ -507,7 +507,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         <button
           onClick={handleResetView}
           className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-xl transition-colors active:scale-90"
-          title="Сбросить к общему плану (100%)"
+          title="Сбросить к общему плану"
         >
           <Maximize2 className="w-4 h-4" />
         </button>
@@ -595,7 +595,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 </text>
                 <text
                   x="240"
-                  y="260"
+                  y="190"
                   textAnchor="middle"
                   fill={activeZoneId === 'zone-sirius' || hoveredZoneId === 'zone-sirius' ? '#ffffff' : '#c7d2fe'}
                   fontSize="22"
@@ -635,7 +635,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 </text>
                 <text
                   x="960"
-                  y="260"
+                  y="190"
                   textAnchor="middle"
                   fill={activeZoneId === 'zone-food' || hoveredZoneId === 'zone-food' ? '#ffffff' : '#fde68a'}
                   fontSize="22"
@@ -667,11 +667,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   strokeDasharray="8 4"
                   className="transition-all duration-200"
                 />
-                {/* Выровненный логотип ТТК по центру */}
-                <rect x="505" y="335" width="190" height="48" rx="10" fill="#E30613" filter="url(#dropShadow)" />
+                {/* Выровненный логотип ТТК по центру (сдвинут выше, чтобы не перекрывать эмблемы) */}
+                <rect x="505" y="315" width="190" height="44" rx="10" fill="#E30613" filter="url(#dropShadow)" />
                 <text
                   x="600"
-                  y="366"
+                  y="343"
                   textAnchor="middle"
                   fill="white"
                   fontSize="16"
@@ -703,7 +703,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   strokeWidth={activeZoneId === 'zone-wifi-1' || hoveredZoneId === 'zone-wifi-1' ? 3 : 1.5}
                   strokeDasharray="4 4"
                 />
-                <text x="600" y="545" textAnchor="middle" fill="#38bdf8" fontSize="12" fontWeight="bold">
+                <text x="600" y="520" textAnchor="middle" fill="#38bdf8" fontSize="11" fontWeight="bold">
                   Wi-Fi 6 ТТК
                 </text>
               </g>
@@ -730,7 +730,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   strokeWidth={activeZoneId === 'zone-entrance' || hoveredZoneId === 'zone-entrance' ? 3.5 : 2}
                   className="transition-all duration-200"
                 />
-                <text x="600" y="702" textAnchor="middle" fill="#6ee7b7" fontSize="16" fontWeight="bold">
+                <text x="600" y="675" textAnchor="middle" fill="#6ee7b7" fontSize="14" fontWeight="bold">
                   ВХОДНАЯ ГРУППА & РЕГИСТРАЦИЯ
                 </text>
               </g>
@@ -755,10 +755,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   stroke="#64748b"
                   strokeWidth={activeZoneId === 'zone-stairs-1' || hoveredZoneId === 'zone-stairs-1' ? 3 : 2}
                 />
-                <line x1="100" y1="640" x2="360" y2="640" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="100" y1="670" x2="360" y2="670" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="100" y1="700" x2="360" y2="700" stroke="#94a3b8" strokeWidth="2" />
-                <text x="230" y="626" textAnchor="middle" fill="#94a3b8" fontSize="13" fontWeight="bold">
+                <line x1="100" y1="655" x2="360" y2="655" stroke="#94a3b8" strokeWidth="2" />
+                <line x1="100" y1="680" x2="360" y2="680" stroke="#94a3b8" strokeWidth="2" />
+                <line x1="100" y1="705" x2="360" y2="705" stroke="#94a3b8" strokeWidth="2" />
+                <text x="230" y="628" textAnchor="middle" fill="#94a3b8" fontSize="13" fontWeight="bold">
                   Лестница на 2 этаж ▲
                 </text>
               </g>
@@ -784,7 +784,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   stroke="#0891b2"
                   strokeWidth={activeZoneId === 'zone-wc-1' || hoveredZoneId === 'zone-wc-1' ? 3 : 2}
                 />
-                <text x="970" y="675" textAnchor="middle" fill="#67e8f9" fontSize="16" fontWeight="bold">
+                <text x="970" y="635" textAnchor="middle" fill="#67e8f9" fontSize="15" fontWeight="bold">
                   Санузлы WC (М / Ж / МГН)
                 </text>
               </g>
@@ -827,7 +827,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   stroke="#e11d48"
                   strokeWidth={activeZoneId === 'zone-vip' || hoveredZoneId === 'zone-vip' ? 3.5 : 2}
                 />
-                <text x="600" y="300" textAnchor="middle" fill="#fda4af" fontSize="22" fontWeight="bold">
+                <text x="600" y="210" textAnchor="middle" fill="#fda4af" fontSize="22" fontWeight="bold">
                   VIP Lounge ТТК
                 </text>
               </g>
@@ -852,7 +852,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   stroke="#6366f1"
                   strokeWidth={activeZoneId === 'zone-room-a' || hoveredZoneId === 'zone-room-a' ? 3 : 2}
                 />
-                <text x="230" y="310" textAnchor="middle" fill="#e2e8f0" fontSize="20" fontWeight="bold">
+                <text x="230" y="210" textAnchor="middle" fill="#e2e8f0" fontSize="20" fontWeight="bold">
                   Переговорная «Байкал»
                 </text>
               </g>
@@ -877,7 +877,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   stroke="#6366f1"
                   strokeWidth={activeZoneId === 'zone-room-b' || hoveredZoneId === 'zone-room-b' ? 3 : 2}
                 />
-                <text x="970" y="310" textAnchor="middle" fill="#e2e8f0" fontSize="20" fontWeight="bold">
+                <text x="970" y="210" textAnchor="middle" fill="#e2e8f0" fontSize="20" fontWeight="bold">
                   Переговорная «Енисей»
                 </text>
               </g>
@@ -902,10 +902,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   stroke="#64748b"
                   strokeWidth={activeZoneId === 'zone-stairs-2' || hoveredZoneId === 'zone-stairs-2' ? 3 : 2}
                 />
-                <line x1="100" y1="640" x2="360" y2="640" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="100" y1="670" x2="360" y2="670" stroke="#94a3b8" strokeWidth="2" />
-                <line x1="100" y1="700" x2="360" y2="700" stroke="#94a3b8" strokeWidth="2" />
-                <text x="230" y="675" textAnchor="middle" fill="#94a3b8" fontSize="14" fontWeight="bold">
+                <line x1="100" y1="655" x2="360" y2="655" stroke="#94a3b8" strokeWidth="2" />
+                <line x1="100" y1="680" x2="360" y2="680" stroke="#94a3b8" strokeWidth="2" />
+                <line x1="100" y1="705" x2="360" y2="705" stroke="#94a3b8" strokeWidth="2" />
+                <text x="230" y="628" textAnchor="middle" fill="#94a3b8" fontSize="13" fontWeight="bold">
                   Спуск на 1 этаж ▼
                 </text>
               </g>
