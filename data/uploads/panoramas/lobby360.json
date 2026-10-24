@@ -1,21 +1,22 @@
 {
-  "width": 1796,
-  "height": 898,
+  "width": 1802,
+  "height": 901,
   "aspectRatio": 2.0,
-  "full": "/app/uploads/panoramas/lobby360.webp",
-  "preview": "/app/uploads/panoramas/lobby360_preview.webp",
+  "previewWidth": 1024,
+  "previewHeight": 512,
   "bytes": {
-    "full": 999494,
-    "preview": 206456
+    "full": 949462,
+    "preview": 199804
   },
   "type": "panorama",
-  "sourceFrames": [
-    "/app/uploads/lobby360/f1.jpg",
-    "/app/uploads/lobby360/f2.jpg",
-    "/app/uploads/lobby360/f3.jpg"
-  ],
-  "createdAt": "2026-10-23T20:31:54.640518+00:00",
+  "createdAt": "2026-10-24T20:15:13.179537+00:00",
   "id": "lobby360",
   "url": "/uploads/panoramas/lobby360.webp",
-  "previewUrl": "/uploads/panoramas/lobby360_preview.webp"
+  "previewUrl": "/uploads/panoramas/lobby360_preview.webp",
+  "sourceFramesCount": 3,
+  "floorId": "",
+  "x": 0.0,
+  "y": 0.0,
+  "yawOffset": 0.0,
+  "hotspots": []
 }

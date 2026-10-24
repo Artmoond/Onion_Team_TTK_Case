@@ -1,8 +1,10 @@
 import os
 import json
+import re
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from urllib.parse import quote
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -26,6 +28,14 @@ app.add_middleware(
 
 UPLOAD_DIR = Path(os.getenv("TTK_UPLOAD_DIR", "/app/uploads"))
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+PANORAMA_INDEX = UPLOAD_DIR / "panoramas" / "index.json"
+FOLDER_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+MAX_UPLOAD_BYTES = int(os.getenv("TTK_MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
+ALLOWED_UPLOAD_EXTENSIONS = {
+    ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff",
+    ".svg", ".json",
+}
 
 # Монтируем папку с загрузками для раздачи файлов (планы, панорамы)
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -99,6 +109,24 @@ def build_route(slug: str, req: RouteRequestModel):
     route["panoramas"] = panos[:3]
     return route
 
+# --- ПАНОРАМЫ, ПОДГОТОВЛЕННЫЕ CV-WORKER ---
+@app.get("/api/panoramas")
+def list_panoramas():
+    """Отдаёт каталог панорам из /app/uploads/panoramas/index.json как есть."""
+    if not PANORAMA_INDEX.exists():
+        return {"generatedAt": None, "count": 0, "panoramas": []}
+
+    try:
+        with open(PANORAMA_INDEX, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=500, detail="index.json панорам повреждён") from exc
+
+    if not isinstance(data, dict) or not isinstance(data.get("panoramas"), list):
+        raise HTTPException(status_code=500, detail="index.json панорам имеет неверный формат")
+    return data
+
+
 # --- API ОРГАНИЗАТОРА (ДЛЯ АДМИНКИ) ---
 @app.get("/api/venues")
 def list_venues():
@@ -109,12 +137,70 @@ def save_venue(slug: str, updated_venue: Dict[str, Any]):
     local_venues_db[slug] = updated_venue
     return {"status": "saved", "slug": slug}
 
+
+def _safe_upload_name(filename: str) -> str:
+    # Браузеры иногда присылают C:\fakepath\file.jpg — приводим оба разделителя.
+    name = Path(filename.replace("\\", "/")).name.strip()
+    if not name or name in {".", ".."} or name.startswith("."):
+        raise HTTPException(status_code=400, detail="Недопустимое имя файла")
+    if Path(name).suffix.lower() not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Недопустимый тип файла. Разрешены: {', '.join(sorted(ALLOWED_UPLOAD_EXTENSIONS))}",
+        )
+    return name
+
+
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...)):
-    filename = file.filename or "upload.bin"
-    safe_name = f"{filename}"
-    file_path = UPLOAD_DIR / safe_name
-    with open(file_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
-    return {"url": f"/uploads/{safe_name}", "size": len(content)}
+async def upload_file(
+    file: UploadFile = File(...),
+    folder: Optional[str] = Form(None),
+):
+    """Загружает файл в /app/uploads или в /app/uploads/<folder>.
+
+    Папка нужна, чтобы положить 2+ кадра одной панорамы: cv-worker сшивает
+    такие папки автоматически. Имя папки ограничено [A-Za-z0-9_-].
+    """
+    safe_name = _safe_upload_name(file.filename or "")
+
+    if folder is not None and folder != "":
+        if not FOLDER_RE.fullmatch(folder):
+            raise HTTPException(
+                status_code=400,
+                detail="folder должен соответствовать [A-Za-z0-9_-]{1,64}",
+            )
+        target_dir = UPLOAD_DIR / folder
+    else:
+        target_dir = UPLOAD_DIR
+        folder = None
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    file_path = (target_dir / safe_name).resolve()
+    if UPLOAD_DIR.resolve() not in file_path.parents:
+        raise HTTPException(status_code=400, detail="Недопустимый путь загрузки")
+
+    size = 0
+    try:
+        with open(file_path, "wb") as out:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+                if size > MAX_UPLOAD_BYTES:
+                    raise HTTPException(
+                        status_code=413,
+                        detail=f"Файл больше {MAX_UPLOAD_BYTES} байт",
+                    )
+                out.write(chunk)
+    except HTTPException:
+        file_path.unlink(missing_ok=True)
+        raise
+    except OSError as exc:
+        file_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail="Не удалось сохранить файл") from exc
+
+    if size == 0:
+        file_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=400, detail="Пустой файл")
+
+    encoded_name = quote(safe_name)
+    url = f"/uploads/{folder}/{encoded_name}" if folder else f"/uploads/{encoded_name}"
+    return {"url": url, "size": size, "folder": folder, "filename": safe_name}

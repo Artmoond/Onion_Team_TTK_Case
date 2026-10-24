@@ -30,31 +30,54 @@
 `watch` и каждые 5 секунд проверяет `/app/uploads`.
 
 Результаты складываются в `/app/uploads/panoramas`, а бэкенд раздаёт их по
-`http://localhost:8000/uploads/panoramas/<name>.webp`.
+`http://localhost:8000/uploads/panoramas/<name>.webp` и отдаёт каталог через
+`GET /api/panoramas`.
+
+Контейнер запускается не от root (UID/GID по умолчанию `1000:1000`) и имеет
+`HEALTHCHECK` по heartbeat-файлу. Если на Linux ваш UID отличается, пересоберите
+образ с нужными значениями:
+
+```bash
+CV_UID=$(id -u) CV_GID=$(id -g) docker compose up --build -d cv-worker
+```
 
 ## Как это работает
 
 1. Одиночные изображения в `/app/uploads` сжимаются в full + preview.
 2. Подпапка с 2+ изображениями считается набором кадров и сшивается в панораму
    с именем этой подпапки.
-3. Для каждой панорамы пишется `<name>.json` — манифест с `url`,
-   `previewUrl`, размерами (включая `previewWidth`/`previewHeight`), списком
-   исходных кадров и полями `Panorama`: `floorId`, `x`, `y`, `yawOffset`,
-   `hotspots`. Если `--public-prefix` не задан, URL будут относительными
-   (`lobby.webp`), иначе — `/uploads/panoramas/lobby.webp`.
+3. Для каждой панорамы пишется `<name>.json` — публичный манифест с `url`,
+   `previewUrl`, размерами (включая `previewWidth`/`previewHeight`),
+   `createdAt`, количеством исходных кадров (`sourceFramesCount`) и полями
+   `Panorama`: `floorId`, `x`, `y`, `yawOffset`, `hotspots`. Внутренние пути
+   контейнера (`full`, `preview`, `source`, `sourceFrames`) в манифест не
+   попадают. Если `--public-prefix` не задан, URL будут относительными
+   (`lobby.webp`), иначе — `/uploads/panoramas/lobby.webp`; имена
+   URL-кодируются.
 4. Хотспоты можно положить рядом с кадрами в `hotspots.json` (для сшивки) или
    в `<name>.hotspots.json` (для одиночного изображения); также работает
    `--hotspots-file`.
 5. После прохода пишется `index.json` — каталог всех манифестов с `count` и
    `panoramas`, чтобы не сканировать папку снаружи.
-6. Обработанные файлы запоминаются в `.cv-worker-state.json` по размеру и
-   mtime, а также по параметрам сжатия. Изменение `--max-width`, качества или
-   `--no-crop` автоматически пересобирает результат.
+6. Обработанные файлы запоминаются в `.cv-worker-state.json` по размеру,
+   mtime, параметрам сжатия, опциям сшивки, `--public-prefix`, метаданным
+   `floorId/x/y/yawOffset`, содержимому хотспотов и версии схемы манифеста.
+   Изменение любого из этих параметров пересобирает результат.
 7. Файлы, изменённые менее `--settle-seconds` назад, пропускаются — это
    защищает от обработки недописанного upload. Если хотя бы один из
-   `*.webp`/`*_preview.webp`/`*.json` пропал, панорама пересобирается.
-8. Запись WebP и манифестов атомарная: сначала во временный файл, затем
-   `os.replace`, поэтому оборванная обработка не оставляет битых результатов.
+   `*.webp`/`*_preview.webp`/`*.json` пропал или манифест повреждён,
+   панорама пересобирается.
+8. Запись WebP, манифестов, state и `index.json` атомарная: сначала во
+   временный файл, затем `os.replace`, поэтому оборванная обработка не
+   оставляет битых результатов.
+9. Одинаковые имена разводятся: `a.jpg` и `a.png` дадут `a__jpg`/`a__png`,
+   папка `lobby` и файл `lobby.jpg` — `lobby__stitch`/`lobby__jpg`.
+   Это защищает от молчаливой перезаписи.
+10. Параллельные проходы защищены lock-файлом `.cv-worker.lock`; в начале и в
+    конце каждого прохода обновляется `.cv-worker-heartbeat` для Docker
+    `HEALTHCHECK`.
+11. `--prune` удаляет `<name>.webp`, `<name>_preview.webp` и `<name>.json`,
+    если исходники задачи исчезли. Без флага старые результаты остаются.
 
 Пример структуры загрузок:
 
@@ -83,14 +106,18 @@ python worker.py compress path/to/pano.jpg -o uploads/panoramas
 # Сшить кадры и сразу сделать WebP
 python worker.py stitch shots/*.jpg -n lobby -o uploads/panoramas
 
-# Один проход по папке (удобно в cron / CI)
+# Один проход по папке (удобно в cron / CI).
+# При ошибках хотя бы одной задачи код возврата будет 1.
 python worker.py watch -i data/uploads -o data/uploads/panoramas --once
 
-# Постоянное наблюдение
+# Постоянное наблюдение (ошибки логируются, цикл продолжается, код 0 при SIGTERM)
 python worker.py watch -i data/uploads -o data/uploads/panoramas --interval 5
 
 # Один проход без ожидания «успокоения» файлов (например, в CI)
 python worker.py watch -i data/uploads -o data/uploads/panoramas --once --settle-seconds 0
+
+# Удалить результаты, чьи исходники больше не лежат в input-dir
+python worker.py watch -i data/uploads -o data/uploads/panoramas --once --prune
 
 # Сшивка с явными хотспотами и метаданными для Panorama
 python worker.py stitch shots/*.jpg -n lobby -o uploads/panoramas \
@@ -99,6 +126,17 @@ python worker.py stitch shots/*.jpg -n lobby -o uploads/panoramas \
 
 Полезные флаги сжатия: `--preview-width`, `--max-width`, `--quality-full`,
 `--quality-preview`, `--no-crop`, `--public-prefix`.
+
+Особенности CLI:
+
+- `compress` и `stitch` возвращают `1`, если хотя бы один файл не обработан
+  или не удалось взять lock.
+- `watch --once` возвращает `1`, если в проходе были ошибки. Это позволяет
+  использовать его в CI и health-проверках.
+- Постоянный `watch` не завершается из-за битого файла: ошибка логируется,
+  остальные задачи в проходе продолжают обрабатываться.
+- Имена задач санитизируются: `-n ../escape` и имена с разделителями пути
+  отклоняются.
 
 Метаданные манифеста: `--floor-id`, `--x`, `--y`, `--yaw-offset`,
 `--hotspots-file`.

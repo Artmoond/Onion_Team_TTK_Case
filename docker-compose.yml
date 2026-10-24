@@ -58,6 +58,11 @@ services:
     build:
       context: ./cv-worker
       dockerfile: Dockerfile
+      # На Linux UID/GID должны совпадать с владельцем ./data/uploads.
+      # При необходимости: CV_UID=$(id -u) CV_GID=$(id -g) docker compose up -d
+      args:
+        APP_UID: ${CV_UID:-1000}
+        APP_GID: ${CV_GID:-1000}
     container_name: ttk-cv-worker
     volumes:
       - ./cv-worker:/app
