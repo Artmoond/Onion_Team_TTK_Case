@@ -58,8 +58,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Базовый масштаб по умолчанию: 1.25 (отображается как 100%)
-  const BASE_SCALE = 1.25;
+  // Базовый масштаб по умолчанию: 1.0 (ровно 100%, весь план полностью виден)
+  const BASE_SCALE = 1.0;
   const MAX_SCALE = 3.5;
 
   // Состояние трансформации (масштаб и смещение)
@@ -91,7 +91,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           height: 430,
           centerX: 240,
           centerY: 265,
-          zoomScale: 2.15,
+          zoomScale: 1.8,
           poiIds: ['poi-main-hall'],
           panoIds: ['pano-hall'],
           color: '#6366f1',
@@ -107,7 +107,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           height: 430,
           centerX: 960,
           centerY: 265,
-          zoomScale: 2.15,
+          zoomScale: 1.8,
           poiIds: ['poi-food'],
           panoIds: ['pano-food'],
           color: '#f59e0b',
@@ -122,7 +122,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           r: 115,
           centerX: 600,
           centerY: 360,
-          zoomScale: 2.3,
+          zoomScale: 1.9,
           poiIds: ['poi-ttk-stand'],
           panoIds: ['pano-ttk'],
           color: '#E30613',
@@ -137,7 +137,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           r: 45,
           centerX: 600,
           centerY: 540,
-          zoomScale: 2.6,
+          zoomScale: 2.1,
           poiIds: ['poi-wifi-1'],
           panoIds: [],
           color: '#3b82f6',
@@ -153,7 +153,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           height: 95,
           centerX: 600,
           centerY: 697,
-          zoomScale: 2.3,
+          zoomScale: 1.9,
           poiIds: ['poi-entrance'],
           panoIds: ['pano-entrance'],
           color: '#10b981',
@@ -169,7 +169,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           height: 145,
           centerX: 230,
           centerY: 672,
-          zoomScale: 2.4,
+          zoomScale: 1.9,
           poiIds: ['poi-stairs-1'],
           panoIds: [],
           color: '#64748b',
@@ -185,7 +185,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           height: 145,
           centerX: 970,
           centerY: 672,
-          zoomScale: 2.4,
+          zoomScale: 1.9,
           poiIds: ['poi-wc-1'],
           panoIds: [],
           color: '#06b6d4',
@@ -498,9 +498,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         </button>
       </div>
 
-      {/* SVG Холст карты — растянут по ширине и высоте */}
+      {/* SVG Холст карты — масштабируется с отступами от краев */}
       <div
-        className="w-full h-full flex items-center justify-center transition-transform duration-300 ease-out"
+        className="w-full h-full flex items-center justify-center transition-transform duration-300 ease-out p-3 sm:p-5"
         style={{
           transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
           transformOrigin: 'center center',
@@ -508,7 +508,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       >
         <svg
           viewBox="0 0 1200 800"
-          className="w-full h-full object-contain overflow-visible drop-shadow-2xl"
+          className="w-full h-full max-w-[1200px] max-h-[800px] object-contain drop-shadow-2xl"
         >
           <defs>
             <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
