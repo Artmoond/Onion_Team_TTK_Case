@@ -1,4 +1,5 @@
 import type { Venue } from '../types/venue';
+import { loadSession } from '../lib/auth';
 
 const DEFAULT_API_BASE = 'http://localhost:8000';
 
@@ -33,7 +34,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const abortFromCaller = () => controller.abort();
   init?.signal?.addEventListener('abort', abortFromCaller, { once: true });
   try {
-    response = await fetch(`${API_BASE}${path}`, { ...init, signal: controller.signal });
+    const headers = new Headers(init?.headers);
+    const session = loadSession();
+    if (session?.accessToken && !headers.has('Authorization')) {
+      headers.set('Authorization', `Bearer ${session.accessToken}`);
+    }
+    response = await fetch(`${API_BASE}${path}`, { ...init, headers, signal: controller.signal });
   } catch (error) {
     if (controller.signal.aborted) throw new ApiError('Запрос к серверу отменён или превысил лимит времени.');
     throw new ApiError(`Сервер недоступен по адресу ${API_BASE}. Используйте локальный режим или запустите сервер.`);

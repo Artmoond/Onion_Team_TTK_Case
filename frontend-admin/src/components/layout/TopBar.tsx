@@ -8,19 +8,24 @@ import {
   Redo2,
   Save,
   Undo2,
+  ShieldCheck,
+  LogOut,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { checkBackend } from '../../services/api';
 import { persistCurrentDraft, useEditorStore } from '../../store/editorStore';
 import { useActiveFloor } from '../../store/editorStore';
+import type { Session } from '../../lib/auth';
 
 interface TopBarProps {
   onOpenBackend: () => void;
   onOpenPublish: () => void;
   onNewProject: () => void;
+  session?: Session | null;
+  onLogout?: () => Promise<void>;
 }
 
-export function TopBar({ onOpenBackend, onOpenPublish, onNewProject }: TopBarProps) {
+export function TopBar({ onOpenBackend, onOpenPublish, onNewProject, session, onLogout }: TopBarProps) {
   const venue = useEditorStore((state) => state.venue);
   const activeFloor = useActiveFloor();
   const dirty = useEditorStore((state) => state.dirty);
@@ -139,6 +144,26 @@ export function TopBar({ onOpenBackend, onOpenPublish, onNewProject }: TopBarPro
         <button className="btn-primary" onClick={onOpenPublish}>
           <QrCode className="h-4 w-4" /> Опубликовать
         </button>
+
+        {session && (
+          <div
+            className="flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-800/80 py-1 pl-2.5 pr-1 text-xs"
+            title={session.user.email}
+          >
+            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            <span className="max-w-[120px] truncate font-medium text-slate-200">{session.user.fullName}</span>
+            <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">Организатор</span>
+            {onLogout && (
+              <button
+                onClick={() => { void onLogout(); }}
+                title="Выйти"
+                className="rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-700/70 hover:text-red-400"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );

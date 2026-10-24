@@ -1,15 +1,15 @@
 {
-  "width": 1802,
-  "height": 901,
-  "aspectRatio": 2.0,
+  "width": 1775,
+  "height": 888,
+  "aspectRatio": 1.999,
   "previewWidth": 1024,
   "previewHeight": 512,
   "bytes": {
-    "full": 949462,
-    "preview": 199804
+    "full": 881866,
+    "preview": 198752
   },
   "type": "panorama",
-  "createdAt": "2026-10-24T20:15:13.179537+00:00",
+  "createdAt": "2026-10-24T22:01:24.309605+00:00",
   "id": "lobby360",
   "url": "/uploads/panoramas/lobby360.webp",
   "previewUrl": "/uploads/panoramas/lobby360_preview.webp",

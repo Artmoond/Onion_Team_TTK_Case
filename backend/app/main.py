@@ -123,6 +123,17 @@ def load_initial_data():
         except Exception as e:
             print(f"Error loading initial mock data: {e}")
 
+    venues_dir = UPLOAD_DIR / "venues"
+    if venues_dir.exists():
+        for fpath in venues_dir.glob("*.json"):
+            try:
+                with open(fpath, "r", encoding="utf-8") as f:
+                    v = json.load(f)
+                    if isinstance(v, dict) and "slug" in v:
+                        local_venues_db[v["slug"]] = v
+            except Exception as e:
+                print(f"Error loading venue from {fpath}: {e}")
+
 load_initial_data()
 
 # --- СХЕМЫ ЗАПРОСОВ ---
@@ -202,9 +213,27 @@ def list_panoramas():
 def list_venues(_admin=Depends(require_admin)):
     return list(local_venues_db.values())
 
+@app.get("/api/venues/{slug}")
+def get_venue(slug: str, _admin=Depends(require_admin)):
+    venue = local_venues_db.get(slug)
+    if not venue:
+        raise HTTPException(status_code=404, detail="Площадка не найдена")
+    return venue
+
 @app.put("/api/venues/{slug}")
 def save_venue(slug: str, updated_venue: Dict[str, Any], _admin=Depends(require_admin)):
     local_venues_db[slug] = updated_venue
+    try:
+        venues_dir = UPLOAD_DIR / "venues"
+        venues_dir.mkdir(parents=True, exist_ok=True)
+        safe_slug = re.sub(r"[^A-Za-z0-9_-]", "_", slug)
+        dest = venues_dir / f"{safe_slug}.json"
+        tmp_dest = venues_dir / f"{safe_slug}.tmp"
+        with open(tmp_dest, "w", encoding="utf-8") as f:
+            json.dump(updated_venue, f, ensure_ascii=False, indent=2)
+        tmp_dest.replace(dest)
+    except Exception as e:
+        print(f"Warning: could not persist venue to disk: {e}")
     return {"status": "saved", "slug": slug}
 
 

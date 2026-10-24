@@ -321,9 +321,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         };
       }
       const removedFloor = state.venue.floors.find((floor) => floor.id === floorId);
-      const removedStairIds = new Set((removedFloor?.stairs ?? []).map((stair) => stair.id));
+      const removedStairIds = new Set<string>((removedFloor?.stairs ?? []).map((stair) => stair.id));
       const floors = state.venue.floors.filter((floor) => floor.id !== floorId);
-      const venue = clearStairReferences({ ...state.venue, floors }, removedStairIds, new Set([floorId]));
+      const venue = clearStairReferences({ ...state.venue, floors }, removedStairIds, new Set<string>([floorId]));
       const nextFloor = venue.floors.find((floor) => floor.id === state.activeFloorId) ?? venue.floors[0];
       return {
         ...withHistory(state, venue, true),
@@ -359,7 +359,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!state.venue) return {};
       const floor = state.venue.floors.find((item) => item.id === floorId);
       if (!floor) return {};
-      const removedStairIds = new Set((floor.stairs ?? []).map((stair) => stair.id));
+      const removedStairIds = new Set<string>((floor.stairs ?? []).map((stair) => stair.id));
       const cleared = mapFloor(state.venue, floorId, (item) => ({
         ...item,
         points: [],

@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
-import { Search, Layers, X, Sparkles } from 'lucide-react';
+import { Search, Layers, X, Sparkles, UserRound, LogOut } from 'lucide-react';
 import { Floor, POI } from '../types';
+import type { Session } from '../lib/auth';
 
 interface HeaderProps {
   floors: Floor[];
@@ -12,6 +13,8 @@ interface HeaderProps {
   // Новые пропсы для живого поиска
   searchResults?: POI[];
   onSelectSearchResult?: (poi: POI) => void;
+  session?: Session | null;
+  onLogout?: () => Promise<void>;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -22,6 +25,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchChange,
   searchResults = [],
   onSelectSearchResult,
+  session,
+  onLogout,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -55,22 +60,47 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* Переключатель этажей */}
-        <div className="flex items-center bg-slate-800/80 p-0.5 rounded-lg border border-slate-700/60">
-          {floors.map(floor => (
-            <button
-              key={floor.id}
-              onClick={() => onSelectFloor(floor.id)}
-              className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-md transition-all font-medium ${
-                activeFloorId === floor.id
-                  ? 'bg-[#E30613] text-white shadow font-bold'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+        <div className="flex items-center gap-2">
+          {/* Переключатель этажей */}
+          <div className="flex items-center bg-slate-800/80 p-0.5 rounded-lg border border-slate-700/60">
+            {floors.map(floor => (
+              <button
+                key={floor.id}
+                onClick={() => onSelectFloor(floor.id)}
+                className={`flex items-center gap-1 text-xs px-2.5 py-1 rounded-md transition-all font-medium ${
+                  activeFloorId === floor.id
+                    ? 'bg-[#E30613] text-white shadow font-bold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Layers className="w-3 h-3" />
+                <span>{floor.level} эт.</span>
+              </button>
+            ))}
+          </div>
+
+          {session && (
+            <div
+              className="flex items-center gap-1.5 bg-slate-800/90 border border-slate-700 rounded-full pl-1.5 pr-1 py-0.5"
+              title={session.user.email}
             >
-              <Layers className="w-3 h-3" />
-              <span>{floor.level} эт.</span>
-            </button>
-          ))}
+              <span className="w-5 h-5 rounded-full bg-[#E30613] flex items-center justify-center">
+                <UserRound className="w-3 h-3 text-white" />
+              </span>
+              <span className="text-[11px] text-slate-200 max-w-[80px] sm:max-w-[120px] truncate font-medium">
+                {session.user.fullName}
+              </span>
+              {onLogout && (
+                <button
+                  onClick={() => { void onLogout(); }}
+                  title="Выйти"
+                  className="text-slate-400 hover:text-red-400 p-1 rounded-full hover:bg-slate-700/70 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
