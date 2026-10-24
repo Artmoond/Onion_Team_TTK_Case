@@ -4,14 +4,13 @@
 
 ---
 
-## 🚀 Быстрый старт через Docker Compose в WSL
+## 🚀 Быстрый старт через Docker
 
-Вам **не нужно** ставить вручную Python, Node.js или базы данных на Windows. Всё поднимается одной командой:
+Вам **не нужно** ставить вручную Python, Node.js или базы данных. Всё поднимается одной командой:
 
-```powershell
-.\start.ps1
-```
-*(Или в терминале: `wsl docker compose up --build -d`)*
+- **Windows:** дважды кликните по файлу **`start.bat`** (или в PowerShell: `.\start.ps1`)
+  *(Скрипт сам определит, как у вас установлен Docker — через Docker Desktop или WSL)*
+- **macOS / Linux:** в терминале запустите `./start.sh`
 
 ### Сервисы доступны по адресам:
 - 📱 **Клиент посетителя (Mobile Web):** [http://localhost:3000](http://localhost:3000)
@@ -19,9 +18,8 @@
 - 🚀 **Backend API & Swagger docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
 
 Остановка всех контейнеров:
-```powershell
-.\stop.ps1
-```
+- **Windows:** запустить `stop.bat` или `.\stop.ps1`
+- **macOS / Linux:** `./stop.sh`
 
 ---
 
