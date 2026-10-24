@@ -37,6 +37,7 @@ from stitcher import (
 LOG = logging.getLogger("cv-worker")
 
 STATE_FILE = ".cv-worker-state.json"
+DEFAULT_SETTLE_SECONDS = 2.0
 
 
 @dataclass
@@ -45,12 +46,29 @@ class Job:
     name: str
     frames: list[Path]
 
-    def fingerprint(self) -> str:
+    def fingerprint(self, options_key: str = "") -> str:
         parts = []
         for path in self.frames:
             stat = path.stat()
             parts.append(f"{path.name}:{stat.st_size}:{int(stat.st_mtime)}")
+        parts.append(f"options:{options_key}")
         return "|".join(parts)
+
+    def is_settled(self, settle_seconds: float) -> bool:
+        if settle_seconds <= 0:
+            return True
+        now = time.time()
+        try:
+            return all(now - path.stat().st_mtime >= settle_seconds for path in self.frames)
+        except OSError:
+            return False
+
+
+def outputs_exist(output_dir: Path, name: str) -> bool:
+    return all(
+        (output_dir / filename).exists()
+        for filename in (f"{name}.webp", f"{name}_preview.webp", f"{name}.json")
+    )
 
 
 def load_state(output_dir: Path) -> dict:
@@ -125,10 +143,17 @@ def process_once(input_dir: Path, output_dir: Path, args: argparse.Namespace) ->
     state = load_state(output_dir)
     processed = 0
 
+    options_key = json.dumps(compression_options(args), sort_keys=True, default=str)
+    settle_seconds = getattr(args, "settle_seconds", 0.0)
+
     for job in discover_jobs(input_dir, output_dir):
-        fingerprint = job.fingerprint()
+        fingerprint = job.fingerprint(options_key)
         key = f"{job.kind}:{job.name}"
-        if state.get(key) == fingerprint:
+        if state.get(key) == fingerprint and outputs_exist(output_dir, job.name):
+            continue
+
+        if not job.is_settled(settle_seconds):
+            LOG.debug("откладываю %s: файлы ещё обновляются", job.name)
             continue
 
         LOG.info("задача %s: %s (%d кадр.)", job.kind, job.name, len(job.frames))
@@ -225,6 +250,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--interval",
         type=float,
         default=float(os.getenv("CV_WATCH_INTERVAL", "5")),
+    )
+    watch.add_argument(
+        "--settle-seconds",
+        type=float,
+        default=float(os.getenv("CV_SETTLE_SECONDS", str(DEFAULT_SETTLE_SECONDS))),
+        help="не брать файлы, изменённые менее N секунд назад (0 — отключить)",
     )
     watch.add_argument("--once", action="store_true", help="один проход и выход")
     add_compression_args(watch)

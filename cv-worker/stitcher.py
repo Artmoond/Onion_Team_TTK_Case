@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Sequence
@@ -64,7 +65,15 @@ def crop_to_aspect(image: Image.Image, aspect: float = PANORAMA_ASPECT) -> Image
 
 def _save_webp(image: Image.Image, path: Path, quality: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    image.save(path, "WEBP", quality=quality, method=6)
+    tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    try:
+        image.save(tmp_path, "WEBP", quality=quality, method=6)
+        os.replace(tmp_path, path)
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 def _compress_image(
@@ -86,10 +95,14 @@ def _compress_image(
         new_height = max(1, round(full.height * (max_width / full.width)))
         full = full.resize((max_width, new_height), Image.Resampling.LANCZOS)
 
-    preview = full.resize(
-        (preview_width, max(1, round(preview_width / (full.width / full.height)))),
-        Image.Resampling.LANCZOS,
-    )
+    target_preview_width = min(preview_width, full.width)
+    if target_preview_width == full.width:
+        preview = full
+    else:
+        preview = full.resize(
+            (target_preview_width, max(1, round(target_preview_width / (full.width / full.height)))),
+            Image.Resampling.LANCZOS,
+        )
 
     full_path = output_dir / f"{stem}.webp"
     preview_path = output_dir / f"{stem}_preview.webp"
@@ -101,6 +114,8 @@ def _compress_image(
         "width": full.width,
         "height": full.height,
         "aspectRatio": round(full.width / full.height, 3),
+        "previewWidth": preview.width,
+        "previewHeight": preview.height,
         "full": str(full_path),
         "preview": str(preview_path),
         "bytes": {

@@ -42,6 +42,16 @@ def test_compress_creates_full_and_preview(tmp_path):
         assert image.size == (1024, 512)
 
 
+def test_preview_is_not_upscaled(tmp_path):
+    source = make_image(tmp_path / "small.png", (800, 400))
+    result = compress_panorama(source, tmp_path / "out")
+
+    assert result["width"] == 800
+    assert result["previewWidth"] == 800
+    assert result["previewHeight"] == 400
+    assert not list((tmp_path / "out").glob(".*.tmp"))
+
+
 def test_compress_non_equirectangular_is_cropped(tmp_path):
     source = make_image(tmp_path / "square.png", (2000, 2000))
     result = compress_panorama(source, tmp_path / "out")
