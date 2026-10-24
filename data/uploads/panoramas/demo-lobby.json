@@ -1,0 +1,15 @@
+{
+  "width": 4096,
+  "height": 2048,
+  "aspectRatio": 2.0,
+  "full": "/app/uploads/panoramas/demo-lobby.webp",
+  "preview": "/app/uploads/panoramas/demo-lobby_preview.webp",
+  "bytes": {
+    "full": 104146,
+    "preview": 28006
+  },
+  "source": "/app/uploads/demo-lobby.png",
+  "id": "demo-lobby",
+  "url": "/uploads/panoramas/demo-lobby.webp",
+  "previewUrl": "/uploads/panoramas/demo-lobby_preview.webp"
+}
