@@ -2,14 +2,20 @@
   "width": 4096,
   "height": 2048,
   "aspectRatio": 2.0,
-  "full": "/app/uploads/panoramas/demo-lobby.webp",
-  "preview": "/app/uploads/panoramas/demo-lobby_preview.webp",
+  "previewWidth": 1024,
+  "previewHeight": 512,
   "bytes": {
     "full": 104146,
     "preview": 28006
   },
-  "source": "/app/uploads/demo-lobby.png",
   "id": "demo-lobby",
+  "type": "panorama",
   "url": "/uploads/panoramas/demo-lobby.webp",
-  "previewUrl": "/uploads/panoramas/demo-lobby_preview.webp"
+  "previewUrl": "/uploads/panoramas/demo-lobby_preview.webp",
+  "createdAt": "2026-10-24T20:15:11.407668+00:00",
+  "floorId": "",
+  "x": 0.0,
+  "y": 0.0,
+  "yawOffset": 0.0,
+  "hotspots": []
 }

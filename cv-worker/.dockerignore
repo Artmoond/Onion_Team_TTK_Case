@@ -5,6 +5,8 @@ __pycache__
 .pytest_cache
 .vscode
 .git
+.cv-worker.lock
+.cv-worker-heartbeat
 __pycache__/
 *.py[cod]
 .pytest_cache/

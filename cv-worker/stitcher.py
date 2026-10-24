@@ -7,13 +7,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Sequence
+from urllib.parse import quote
 
 import cv2
 from PIL import Image, ImageOps
+
+LOG = logging.getLogger("cv-worker.stitcher")
 
 SUPPORTED_EXTENSIONS = {
     ".jpg", ".jpeg", ".png", ".webp", ".bmp", ".tif", ".tiff",
@@ -38,6 +42,25 @@ _STITCH_ERRORS = {
 
 class StitchingError(RuntimeError):
     """Ошибка сшивки кадров в панораму."""
+
+
+def validate_name(name: str) -> str:
+    """Проверяет, что имя результата — безопасный компонент пути.
+
+    Имя используется как основа для ``<name>.webp``, ``<name>_preview.webp`` и
+    ``<name>.json``. Поэтому оно не должно содержать разделителей пути, быть
+    пустым или указывать на текущую/родительскую директорию.
+    """
+    value = str(name)
+    if (
+        not value
+        or value in {".", ".."}
+        or "/" in value
+        or "\\" in value
+        or Path(value).name != value
+    ):
+        raise ValueError(f"недопустимое имя результата: {name!r}")
+    return value
 
 
 def is_supported_image(path: Path) -> bool:
@@ -91,6 +114,7 @@ def _compress_image(
     quality_preview: int,
     force_aspect: float | None,
 ) -> dict:
+    stem = validate_name(stem)
     if force_aspect:
         image = crop_to_aspect(image, force_aspect)
 
@@ -133,19 +157,24 @@ def compress_panorama(
     image_path: Path | str,
     output_dir: Path | str,
     *,
+    name: str | None = None,
     preview_width: int = DEFAULT_PREVIEW_WIDTH,
     max_width: int = DEFAULT_MAX_WIDTH,
     quality_full: int = DEFAULT_QUALITY_FULL,
     quality_preview: int = DEFAULT_QUALITY_PREVIEW,
     force_aspect: float | None = PANORAMA_ASPECT,
 ) -> dict:
-    """Готовит из исходного изображения full (до 4096px) и preview (1024px) WebP."""
+    """Готовит из исходного изображения full (до 4096px) и preview (1024px) WebP.
+
+    ``name`` позволяет задать имя результата независимо от имени исходника —
+    это нужно при коллизиях ``a.jpg``/``a.png``.
+    """
     image_path = Path(image_path)
     output_dir = Path(output_dir)
     image = _open_rgb(image_path)
     result = _compress_image(
         image,
-        image_path.stem,
+        name or image_path.stem,
         output_dir,
         preview_width=preview_width,
         max_width=max_width,
@@ -162,7 +191,7 @@ def _read_frames(image_paths: Sequence[Path]) -> list:
     for path in image_paths:
         frame = cv2.imread(str(path), cv2.IMREAD_COLOR)
         if frame is None:
-            print(f"[stitcher] пропуск нечитаемого файла: {path}")
+            LOG.warning("пропуск нечитаемого файла: %s", path)
             continue
         frames.append(frame)
     return frames
@@ -264,7 +293,7 @@ def stitch_and_compress(
 
 
 def public_url(prefix: str, path: Path | str) -> str:
-    name = Path(path).name
+    name = quote(Path(path).name)
     if not prefix:
         return name
     return f"{prefix.rstrip('/')}/{name}"
@@ -275,12 +304,26 @@ def build_manifest(
     public_prefix: str = "",
     metadata: dict | None = None,
 ) -> dict:
-    """Дополняет результат ссылками, совместимыми с shared/types.ts (Panorama)."""
-    manifest = dict(result)
-    manifest["id"] = Path(result.get("full", "panorama")).stem
+    """Дополняет результат ссылками, совместимыми с shared/types.ts (Panorama).
+
+    В публичный манифест не попадают внутренние пути контейнера (``full``,
+    ``preview``, ``source``, ``sourceFrames``) — только URL и метаданные.
+    """
+    full_path = Path(result.get("full", "panorama"))
+    preview_path = Path(result.get("preview", full_path))
+
+    manifest = {
+        key: value
+        for key, value in result.items()
+        if key not in {"full", "preview", "source", "sourceFrames"}
+    }
+    manifest["id"] = validate_name(full_path.stem)
     manifest["type"] = result.get("type", "panorama")
-    manifest["url"] = public_url(public_prefix, result["full"])
-    manifest["previewUrl"] = public_url(public_prefix, result["preview"])
+    manifest["url"] = public_url(public_prefix, full_path)
+    manifest["previewUrl"] = public_url(public_prefix, preview_path)
+    if "sourceFrames" in result:
+        manifest["sourceFramesCount"] = len(result["sourceFrames"])
+    manifest.setdefault("createdAt", datetime.now(timezone.utc).isoformat())
 
     extra = dict(metadata or {})
     manifest["floorId"] = extra.get("floorId", "")
@@ -292,6 +335,7 @@ def build_manifest(
 
 
 def write_manifest(output_dir: Path | str, name: str, manifest: dict) -> Path:
+    name = validate_name(name)
     path = Path(output_dir) / f"{name}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_name(f".{path.name}.{os.getpid()}.tmp")

@@ -2,12 +2,16 @@ from pathlib import Path
 
 from PIL import Image
 
+import pytest
+
 from stitcher import (
     PANORAMA_ASPECT,
     build_manifest,
     compress_panorama,
     crop_to_aspect,
     public_url,
+    validate_name,
+    write_manifest,
 )
 
 
@@ -95,3 +99,33 @@ def test_manifest_has_panorama_fields_and_relative_urls(tmp_path):
     assert manifest["y"] == 400
     assert manifest["yawOffset"] == 90
     assert manifest["hotspots"] == hotspots
+
+
+def test_public_url_encodes_spaces_and_cyrillic():
+    assert (
+        public_url("/uploads/panoramas", "/x/зал 1.webp")
+        == "/uploads/panoramas/%D0%B7%D0%B0%D0%BB%201.webp"
+    )
+    assert public_url("", "/x/зал 1.webp") == "%D0%B7%D0%B0%D0%BB%201.webp"
+
+
+def test_manifest_strips_internal_paths_and_adds_timestamp(tmp_path):
+    source = make_image(tmp_path / "lobby.png", (2048, 1024))
+    result = compress_panorama(source, tmp_path / "out")
+    manifest = build_manifest(result, "/uploads/panoramas")
+
+    for field in ("full", "preview", "source", "sourceFrames"):
+        assert field not in manifest
+    assert "createdAt" in manifest
+    assert manifest["id"] == "lobby"
+
+
+@pytest.mark.parametrize("name", ["", ".", "..", "../escape", "a/b", "a\\b"])
+def test_validate_name_rejects_unsafe_values(name):
+    with pytest.raises(ValueError):
+        validate_name(name)
+
+
+def test_write_manifest_rejects_path_traversal(tmp_path):
+    with pytest.raises(ValueError):
+        write_manifest(tmp_path, "../escape", {"id": "escape"})

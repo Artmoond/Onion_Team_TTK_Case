@@ -29,3 +29,4 @@ data/postgres_data/
 .DS_Store
 
 data/uploads/
+backend/data/
