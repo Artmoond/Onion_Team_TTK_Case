@@ -20,11 +20,20 @@ export interface Session {
 
 const STORAGE_KEY = 'ttk.auth.session.v1';
 
-const defaultApiHost =
-  typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-    ? `${window.location.protocol}//${window.location.hostname}:8000`
-    : 'http://localhost:8000';
-const API_URL = (import.meta.env.VITE_API_URL || defaultApiHost).replace(/\/+$/, '');
+function getApiUrl(): string {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+  }
+  if (typeof window === 'undefined') {
+    return 'http://localhost:8000';
+  }
+  if (window.location.port === '3000' || window.location.port === '3001') {
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  return window.location.origin;
+}
+
+const API_URL = getApiUrl();
 
 export { API_URL };
 

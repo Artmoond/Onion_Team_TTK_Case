@@ -18,12 +18,14 @@
     "react-dom": "^18.2.0",
     "react-dropzone": "^14.4.1",
     "react-konva": "^18.2.16",
+    "use-sync-external-store": "^1.2.0",
     "zustand": "^4.5.7"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
+    "@types/use-sync-external-store": "^0.0.6",
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.38",

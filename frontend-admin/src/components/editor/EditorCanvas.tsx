@@ -586,8 +586,8 @@ export function EditorCanvas() {
           </Layer>
 
           <Layer>
-            {floor.panoramas.map((panorama) => {
-              const linked = floor.points.find((point) => point.panoramaId === panorama.id);
+            {(floor.panoramas ?? []).map((panorama) => {
+              const linked = (floor.points ?? []).find((point) => point.panoramaId === panorama.id);
               const selected = selection?.kind === 'panorama' && selection.id === panorama.id;
               return (
                 <Group
@@ -617,8 +617,8 @@ export function EditorCanvas() {
           </Layer>
 
           <Layer>
-            {floor.points.map((point) => {
-              const type = POINT_TYPES[point.category];
+            {(floor.points ?? []).map((point) => {
+              const type = (point.category && POINT_TYPES[point.category]) ? POINT_TYPES[point.category] : POINT_TYPES.info;
               const selected = selection?.kind === 'point' && selection.id === point.id;
               const radius = selected ? 17 : 14;
               return (

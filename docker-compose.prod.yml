@@ -64,7 +64,7 @@ services:
       dockerfile: Dockerfile.prod
       args:
         VITE_API_URL: ""
-        VITE_ADMIN_URL: "/admin"
+        VITE_ADMIN_URL: "/admin/"
     container_name: ttk-client
     restart: always
     ports:
@@ -85,7 +85,7 @@ services:
       args:
         VITE_API_URL: ""
         VITE_CLIENT_URL: "/"
-        VITE_BASE_URL: "/"
+        VITE_BASE_URL: "./"
     container_name: ttk-admin
     restart: always
     ports:

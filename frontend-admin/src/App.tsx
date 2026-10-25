@@ -1,8 +1,9 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import AuthScreen from './components/AuthScreen';
 import { clearSession, logoutSession, restoreSession, type Session } from './lib/auth';
 import { FloorTabs } from './components/floors/FloorTabs';
 import { ConfirmDialog } from './components/layout/ConfirmDialog';
+import { ErrorBoundary } from './components/layout/ErrorBoundary';
 import { PropertiesPanel } from './components/layout/PropertiesPanel';
 import { Sidebar } from './components/layout/Sidebar';
 import { ToastView } from './components/layout/Toast';
@@ -11,8 +12,7 @@ import { BackendVenuesModal } from './components/project/BackendVenuesModal';
 import { ProjectStartScreen } from './components/project/ProjectStartScreen';
 import { PublishQrModal } from './components/publish/PublishQrModal';
 import { persistCurrentDraft, useActiveFloor, useEditorStore } from './store/editorStore';
-
-const EditorCanvas = lazy(() => import('./components/editor/EditorCanvas').then((module) => ({ default: module.EditorCanvas })));
+import { EditorCanvas } from './components/editor/EditorCanvas';
 
 interface StudioProps {
   session: Session;
@@ -100,9 +100,9 @@ function Studio({ session, onLogout }: StudioProps) {
       <div className="flex min-h-0 flex-1">
         <Sidebar />
         <main className="relative min-w-0 flex-1">
-          <Suspense fallback={<div className="grid h-full place-items-center text-xs text-slate-500">Загрузка редактора…</div>}>
+          <ErrorBoundary fallbackTitle="Ошибка в области холста" onReset={clearProject}>
             <EditorCanvas />
-          </Suspense>
+          </ErrorBoundary>
         </main>
         <PropertiesPanel />
       </div>
@@ -192,5 +192,9 @@ export default function App() {
     );
   }
 
-  return <Studio session={session} onLogout={handleLogout} />;
+  return (
+    <ErrorBoundary onReset={() => useEditorStore.getState().clearProject()}>
+      <Studio session={session} onLogout={handleLogout} />
+    </ErrorBoundary>
+  );
 }
