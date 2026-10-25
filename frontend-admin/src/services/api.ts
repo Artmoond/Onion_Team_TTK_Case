@@ -1,9 +1,12 @@
 import type { Venue } from '../types/venue';
 import { loadSession } from '../lib/auth';
 
-const DEFAULT_API_BASE = 'http://localhost:8000';
+const defaultApiHost =
+  typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    ? `${window.location.protocol}//${window.location.hostname}:8000`
+    : 'http://localhost:8000';
 
-export const API_BASE = (import.meta.env.VITE_API_URL || DEFAULT_API_BASE).replace(/\/+$/, '');
+export const API_BASE = (import.meta.env.VITE_API_URL || defaultApiHost).replace(/\/+$/, '');
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status?: number) {

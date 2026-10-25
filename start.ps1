@@ -23,10 +23,12 @@ $useWsl = $false
 if ($hasNativeDocker) {
     $null = docker info 2>$null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "-> Docker Desktop доступен. Запуск с пересборкой образов..." -ForegroundColor Gray
-        # --build обязателен после изменения requirements.txt, иначе backend
-        # запустится на старом образе без новых зависимостей.
+        Write-Host "-> Docker Desktop доступен. Запуск сервисов..." -ForegroundColor Gray
         docker compose up -d --build --remove-orphans
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "-> Пересборка не удалась (возможно, нет связи с Docker Hub). Запускаем локальные образы..." -ForegroundColor Yellow
+            docker compose up -d --remove-orphans
+        }
         if ($LASTEXITCODE -ne 0) {
             $exitCode = $LASTEXITCODE
             Show-ComposeFailure
@@ -43,14 +45,9 @@ if ($hasNativeDocker) {
 
 if ($useWsl) {
     $winPath = (Get-Location).Path
-    $wslPath = ""
-    try {
-        $wslPath = (wsl wslpath -u "$winPath" 2>$null).Trim()
-    } catch {}
-
-    if (-not $wslPath) {
-        $wslPath = "/mnt/" + $winPath.Substring(0, 1).ToLower() + $winPath.Substring(2).Replace('\', '/')
-    }
+    $drive = $winPath.Substring(0, 1).ToLower()
+    $rest = $winPath.Substring(2).Replace('\', '/')
+    $wslPath = "/mnt/$drive$rest"
 
     # Проверяем наличие дистрибутива Ubuntu или используем дефолтный
     $wslDistros = (wsl -l -q 2>$null) | Out-String
@@ -62,7 +59,7 @@ if ($useWsl) {
         }
     }
 
-    wsl @distroArg bash -c "cd '$wslPath' && docker compose up -d --build --remove-orphans"
+    wsl @distroArg bash -c "cd '$wslPath' && (docker compose up -d --build --remove-orphans || (echo '-> Запуск на локальных образах...' && docker compose up -d --remove-orphans))"
     if ($LASTEXITCODE -ne 0) {
         Write-Host ""
         Write-Host "❌ Не удалось запустить Docker через WSL." -ForegroundColor Red
@@ -70,6 +67,7 @@ if ($useWsl) {
         Write-Host "Логи: wsl @distroArg docker compose logs --tail=120" -ForegroundColor Gray
         exit $LASTEXITCODE
     }
+
 }
 
 # 2. Ждём готовности backend.
@@ -111,4 +109,9 @@ Write-Host "  Посетитель:  user@ttk.example.com  / User12345!"
 Write-Host "  Организатор: admin@ttk.example.com / Admin12345!"
 Write-Host "  Код регистрации организатора: TTK-ADMIN-2026"
 Write-Host ""
-Write-Host "Для просмотра логов: docker compose logs -f (или wsl docker compose logs -f)" -ForegroundColor Gray
+Write-Host "📡 Трансляция логов сервисов в реальном времени (нажмите Ctrl+C для выхода)..." -ForegroundColor Cyan
+if ($useWsl) {
+    wsl @distroArg docker compose logs -f
+} else {
+    docker compose logs -f
+}

@@ -1,0 +1,32 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    TTK_UPLOAD_DIR=/app/uploads \
+    TTK_AUTH_DB=/app/data/auth.db
+
+# Создаём непривилегированного пользователя для безопасности контейнера
+RUN groupadd -g 1001 ttkapp && \
+    useradd -u 1001 -g ttkapp -s /bin/sh -m ttkapp
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Создаём нужные директории под данные и назначаем права
+RUN mkdir -p /app/uploads /app/data && \
+    chown -R ttkapp:ttkapp /app
+
+USER ttkapp
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')" || exit 1
+
+# Запуск Uvicorn в 2 воркера для продакшен-производительности
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--proxy-headers", "--forwarded-allow-ips", "*"]

@@ -1,6 +1,7 @@
 # Node
 node_modules/
 dist/
+.env
 .env.local
 .env.*.local
 npm-debug.log*
@@ -30,3 +31,4 @@ data/postgres_data/
 
 data/uploads/
 backend/data/
+data/*.db*

@@ -1,0 +1,38 @@
+# --- Этап 1: Сборка оптимизированного бандла Vite ---
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+RUN npm ci || npm install
+
+COPY . .
+
+# Переменные сборки (пустой VITE_API_URL использует относительные пути /api через Nginx Gateway)
+ARG VITE_API_URL=""
+ARG VITE_ADMIN_URL="/admin"
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_ADMIN_URL=$VITE_ADMIN_URL
+
+RUN npm run build
+
+# --- Этап 2: Легковесный продакшен Nginx ---
+FROM nginx:alpine-slim AS runner
+
+WORKDIR /usr/share/nginx/html
+
+# Удаляем дефолтные страницы nginx
+RUN rm -rf ./*
+
+# Копируем скомпилированные ассеты
+COPY --from=builder /app/dist ./
+
+# Копируем production nginx конфигурацию
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD wget -qO- http://127.0.0.1/ || exit 1
+
+CMD ["nginx", "-g", "daemon off;"]
