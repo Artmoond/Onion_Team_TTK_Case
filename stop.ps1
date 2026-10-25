@@ -12,17 +12,13 @@ try {
 } catch {}
 
 if ($hasNativeDocker) {
-    docker compose down
+    docker compose down --remove-orphans 2>$null
+    docker compose -f docker-compose.prod.yml down --remove-orphans 2>$null
 } else {
     $winPath = (Get-Location).Path
-    $wslPath = ""
-    try {
-        $wslPath = (wsl wslpath -u "$winPath" 2>$null).Trim()
-    } catch {}
-
-    if (-not $wslPath) {
-        $wslPath = "/mnt/" + $winPath.Substring(0, 1).ToLower() + $winPath.Substring(2).Replace('\', '/')
-    }
+    $drive = $winPath.Substring(0, 1).ToLower()
+    $rest = $winPath.Substring(2).Replace('\', '/')
+    $wslPath = "/mnt/$drive$rest"
 
     $wslDistros = (wsl -l -q 2>$null) | Out-String
     $distroArg = @()
@@ -33,7 +29,7 @@ if ($hasNativeDocker) {
         }
     }
 
-    wsl @distroArg bash -c "cd '$wslPath' && docker compose down"
+    wsl @distroArg bash -c "cd '$wslPath' && docker compose down --remove-orphans 2>/dev/null; docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null; pkill -f 'sleep infinity' 2>/dev/null || true"
 }
 
-Write-Host "✅ Все контейнеры остановлены." -ForegroundColor Green
+Write-Host "✅ Все контейнеры (Dev и Prod) остановлены." -ForegroundColor Green

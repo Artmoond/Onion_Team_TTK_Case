@@ -1,6 +1,7 @@
 # Node
 node_modules/
 dist/
+.env
 .env.local
 .env.*.local
 npm-debug.log*
@@ -35,3 +36,4 @@ backend/data/
 *.sqlite3
 generate_presentation.py
 qr_codes/
+data/*.db*

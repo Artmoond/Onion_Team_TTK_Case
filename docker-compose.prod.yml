@@ -1,0 +1,126 @@
+# ==============================================================================
+# Production Docker Compose для ТТК «Интерактивная карта пространства»
+# ==============================================================================
+
+services:
+  # 1. Единый Nginx Gateway (порт 80 / 443)
+  gateway:
+    image: nginx:alpine-slim
+    container_name: ttk-gateway
+    restart: always
+    ports:
+      - "${PORT_HTTP:-80}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend-client:
+        condition: service_healthy
+      frontend-admin:
+        condition: service_healthy
+    networks:
+      - ttk-network
+
+  # 2. Бэкенд API и A* алгоритм навигации (Python 3.11, Uvicorn workers)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: ttk-backend
+    restart: always
+    ports:
+      - "${PORT_BACKEND:-8000}:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - TTK_JWT_SECRET=${TTK_JWT_SECRET:-ttk-prod-secret-change-in-env-7f4c2a91b8e35d6c0a4f9e2d1b7c8a63}
+      - TTK_AUTH_DB=/app/data/auth.db
+      - TTK_ADMIN_INVITE_CODE=${TTK_ADMIN_INVITE_CODE:-TTK-ADMIN-2026}
+      - TTK_ADMIN_EMAIL=${TTK_ADMIN_EMAIL:-admin@ttk.example.com}
+      - TTK_ADMIN_PASSWORD=${TTK_ADMIN_PASSWORD:-Admin12345!}
+      - TTK_USER_EMAIL=${TTK_USER_EMAIL:-user@ttk.example.com}
+      - TTK_USER_PASSWORD=${TTK_USER_PASSWORD:-User12345!}
+      - TTK_TRUST_PROXY=true
+      - TTK_CORS_ORIGINS=${TTK_CORS_ORIGINS:-*}
+      - PUBLIC_MAP_BASE_URL=${PUBLIC_MAP_BASE_URL:-http://localhost}
+    volumes:
+      - ./data/uploads:/app/uploads
+      - ./data:/app/data
+      - ./shared:/app/shared:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ttk-network
+
+  # 3. Мобильный клиент посетителя (Nginx Alpine + скомпилированный SPA)
+  frontend-client:
+    build:
+      context: ./frontend-client
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: ""
+        VITE_ADMIN_URL: "/admin"
+    container_name: ttk-client
+    restart: always
+    ports:
+      - "${PORT_CLIENT:-3000}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    networks:
+      - ttk-network
+
+  # 4. Студия редактора для организатора (Nginx Alpine + скомпилированный SPA)
+  frontend-admin:
+    build:
+      context: ./frontend-admin
+      dockerfile: Dockerfile.prod
+      args:
+        VITE_API_URL: ""
+        VITE_CLIENT_URL: "/"
+        VITE_BASE_URL: "/"
+    container_name: ttk-admin
+    restart: always
+    ports:
+      - "${PORT_ADMIN:-3001}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+    networks:
+      - ttk-network
+
+  # 5. Фоновый воркер компьютерного зрения (OpenCV Stitcher)
+  cv-worker:
+    build:
+      context: ./cv-worker
+      dockerfile: Dockerfile
+    container_name: ttk-cv-worker
+    restart: always
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      - CV_INPUT_DIR=/app/uploads
+      - CV_OUTPUT_DIR=/app/uploads/panoramas
+      - CV_WATCH_INTERVAL=5
+      - CV_SETTLE_SECONDS=2
+      - CV_PUBLIC_PREFIX=/uploads/panoramas
+    volumes:
+      - ./data/uploads:/app/uploads
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - ttk-network
+
+networks:
+  ttk-network:
+    driver: bridge

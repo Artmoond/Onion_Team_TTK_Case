@@ -32,14 +32,15 @@ else
     exit 1
 fi
 
-# 3. --build обязателен: после изменения requirements.txt старый образ без
-#    новых Python-зависимостей приведёт к падению backend.
 if ! "${COMPOSE[@]}" up -d --build --remove-orphans; then
-    echo ""
-    echo "❌ Не удалось запустить сервисы. Последние логи:"
-    "${COMPOSE[@]}" ps || true
-    "${COMPOSE[@]}" logs --tail=120 || true
-    exit 1
+    echo "-> Пересборка не удалась (возможно, нет связи с Docker Hub). Запускаем локальные образы..."
+    if ! "${COMPOSE[@]}" up -d --remove-orphans; then
+        echo ""
+        echo "❌ Не удалось запустить сервисы. Последние логи:"
+        "${COMPOSE[@]}" ps || true
+        "${COMPOSE[@]}" logs --tail=120 || true
+        exit 1
+    fi
 fi
 
 # 4. Ждём, пока backend ответит на health-check (если установлен curl).
@@ -80,4 +81,5 @@ echo "  Посетитель:  user@ttk.example.com  / User12345!"
 echo "  Организатор: admin@ttk.example.com / Admin12345!"
 echo "  Код регистрации организатора: TTK-ADMIN-2026"
 echo ""
-echo "Для просмотра логов: ${COMPOSE[*]} logs -f"
+echo "📡 Трансляция логов сервисов в реальном времени (нажмите Ctrl+C для выхода)..."
+"${COMPOSE[@]}" logs -f
