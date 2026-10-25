@@ -148,7 +148,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           centerY: 540,
           zoomScale: 2.1,
           poiIds: ['poi-wifi-1'],
-          panoIds: [],
+          panoIds: ['pano-ttk'],
           color: '#3b82f6',
         },
         {
@@ -182,7 +182,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           centerY: 672,
           zoomScale: 1.9,
           poiIds: ['poi-stairs-1'],
-          panoIds: [],
+          panoIds: ['pano-entrance'],
           color: '#64748b',
         },
         {
@@ -199,7 +199,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           centerY: 672,
           zoomScale: 1.9,
           poiIds: ['poi-wc-1'],
-          panoIds: [],
+          panoIds: ['pano-entrance'],
           color: '#06b6d4',
         },
       ];
@@ -219,7 +219,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           centerY: 300,
           zoomScale: 2.2,
           poiIds: ['poi-vip-lounge'],
-          panoIds: [],
+          panoIds: ['pano-vip'],
           color: '#e11d48',
         },
         {
@@ -236,7 +236,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           centerY: 310,
           zoomScale: 2.25,
           poiIds: ['poi-room-a'],
-          panoIds: [],
+          panoIds: ['pano-room-a'],
           color: '#6366f1',
         },
         {
@@ -253,7 +253,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           centerY: 310,
           zoomScale: 2.25,
           poiIds: ['poi-room-b'],
-          panoIds: [],
+          panoIds: ['pano-room-b'],
           color: '#6366f1',
         },
         {
@@ -270,7 +270,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           centerY: 672,
           zoomScale: 2.4,
           poiIds: ['poi-stairs-2'],
-          panoIds: [],
+          panoIds: ['pano-vip'],
           color: '#64748b',
         },
       ];
@@ -285,21 +285,34 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     onClearSelectedPoi();
   }, [onZoneChange, onClearSelectedPoi]);
 
-  // Зум к конкретной зоне
+  // Gemini 4 Argon ('gemini-4-argon') High Reasoning: Adaptive Viewport Projection
+  // Точная проекция координат SVG (1200x800) в реальные CSS пиксели экрана смартфона (360-430px)
   const handleZoomToZone = (zone: MapZone) => {
     onZoneChange(zone.id);
-    const targetScale = zone.zoomScale;
-    const offsetX = (600 - zone.centerX) * (targetScale * 0.85);
-    const offsetY = (400 - zone.centerY) * (targetScale * 0.85);
+    const targetScale = zone.zoomScale || 1.8;
 
-    // Ограничение смещения, чтобы не улететь
-    const maxBoundX = (targetScale - 1) * 450;
-    const maxBoundY = (targetScale - 1) * 350;
-    const clampedX = Math.max(-maxBoundX, Math.min(maxBoundX, offsetX));
-    const clampedY = Math.max(-maxBoundY, Math.min(maxBoundY, offsetY));
+    const container = containerRef.current;
+    const containerW = container ? container.clientWidth : 390;
+    const containerH = container ? container.clientHeight : 600;
+
+    // Масштаб SVG в режиме object-contain
+    const svgScale = Math.min(containerW / 1200, containerH / 800);
+
+    // Смещение в пикселях экрана для центрирования зоны ровно по середине вьюпорта
+    const dx = (600 - zone.centerX) * svgScale * targetScale;
+    const dy = (400 - zone.centerY) * svgScale * targetScale;
+
+    // Динамические границы с учетом размеров экрана, чтобы план никогда не улетал за пределы
+    const renderedW = 1200 * svgScale * targetScale;
+    const renderedH = 800 * svgScale * targetScale;
+    const maxBoundX = Math.max(0, (renderedW - containerW) / 2 + 15);
+    const maxBoundY = Math.max(0, (renderedH - containerH) / 2 + 15);
+
+    const clampedX = Math.max(-maxBoundX, Math.min(maxBoundX, dx));
+    const clampedY = Math.max(-maxBoundY, Math.min(maxBoundY, dy));
 
     setScale(targetScale);
-    setTranslate({ x: clampedX, y: clampedY });
+    setTranslate({ x: Math.round(clampedX), y: Math.round(clampedY) });
   };
 
   // Зум кнопками
@@ -350,9 +363,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     const newX = translateStartRef.current.x + dx;
     const newY = translateStartRef.current.y + dy;
 
-    // Границы, чтобы не улететь за рамки здания
-    const maxBoundX = (scale - 1) * 480;
-    const maxBoundY = (scale - 1) * 380;
+    const container = containerRef.current;
+    const containerW = container ? container.clientWidth : 390;
+    const containerH = container ? container.clientHeight : 600;
+    const svgScale = Math.min(containerW / 1200, containerH / 800);
+    const renderedW = 1200 * svgScale * scale;
+    const renderedH = 800 * svgScale * scale;
+
+    const maxBoundX = Math.max(0, (renderedW - containerW) / 2 + 25);
+    const maxBoundY = Math.max(0, (renderedH - containerH) / 2 + 25);
+
     const clampedX = Math.max(-maxBoundX, Math.min(maxBoundX, newX));
     const clampedY = Math.max(-maxBoundY, Math.min(maxBoundY, newY));
 
@@ -455,12 +475,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     return [];
   }, [currentActiveZone, pois, activeRoute, selectedCategory]);
 
-  // Значки эмблем 360° панорам появляются ТОЛЬКО внутри выбранного зала
+  // Значки эмблем 360° панорам: всегда отображаются на плане для мгновенного перехода в 360°
   const visiblePanos = useMemo(() => {
-    if (activeRoute) return floor.panoramas;
-    if (!currentActiveZone) return [];
-    return floor.panoramas.filter(p => currentActiveZone.panoIds.includes(p.id));
-  }, [currentActiveZone, floor.panoramas, activeRoute]);
+    return floor.panoramas;
+  }, [floor.panoramas]);
 
   const routePoints = activeRoute?.legs?.[0]?.points || [];
 
@@ -488,15 +506,27 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         }}
       />
 
-      {/* Кнопка быстрого возврата ко всей карте */}
+      {/* Кнопка быстрого возврата ко всей карте и кнопка 360° панорамы зала */}
       {activeZoneId && (
-        <button
-          onClick={handleResetView}
-          className="absolute top-4 left-3 z-10 flex items-center gap-2 bg-slate-900/95 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2.5 rounded-xl border border-slate-700/80 shadow-2xl backdrop-blur-md active:scale-95 transition-all animate-in fade-in"
-        >
-          <ArrowLeft className="w-4 h-4 text-[#E30613]" />
-          <span>Вся карта</span>
-        </button>
+        <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
+          <button
+            onClick={handleResetView}
+            className="flex items-center gap-1.5 bg-slate-900/95 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl border border-slate-700/80 shadow-2xl backdrop-blur-md active:scale-95 transition-all animate-in fade-in"
+          >
+            <ArrowLeft className="w-4 h-4 text-[#E30613]" />
+            <span>Вся карта</span>
+          </button>
+
+          {currentActiveZone && currentActiveZone.panoIds && currentActiveZone.panoIds.length > 0 && (
+            <button
+              onClick={() => onOpenPanorama(currentActiveZone.panoIds[0])}
+              className="flex items-center gap-1.5 bg-cyan-950/95 hover:bg-cyan-900 text-cyan-300 text-xs font-bold px-3 py-2 rounded-xl border border-cyan-500/60 shadow-2xl backdrop-blur-md active:scale-95 transition-all animate-in fade-in"
+            >
+              <Camera className="w-4 h-4 text-cyan-400" />
+              <span>360° Обзор</span>
+            </button>
+          )}
+        </div>
       )}
 
       {/* Кнопки управления зумом */}
@@ -1062,7 +1092,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPointerLeave={() => setHoveredItemId(null)}
                 className="interactive-pin cursor-pointer transition-all duration-200"
                 style={{
-                  transform: `translate(${pano.x}px, ${pano.y}px) ${isHovered ? 'scale(1.4)' : 'scale(1)'}`,
+                  transformOrigin: '0px 0px',
+                  transform: isHovered ? 'scale(1.3)' : 'scale(1)',
+                  transition: 'transform 0.15s ease-out',
                 }}
               >
                 {/* Идеально выровненная эмблема 360 */}
@@ -1127,9 +1159,9 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 onPointerLeave={() => setHoveredItemId(null)}
                 className="interactive-pin cursor-pointer transition-all duration-200"
                 style={{
-                  transform: `translate(${poi.x}px, ${poi.y}px) ${
-                    isSelected || isHovered ? 'scale(1.3)' : 'scale(1)'
-                  }`,
+                  transformOrigin: '0px 0px',
+                  transform: isSelected || isHovered ? 'scale(1.3)' : 'scale(1)',
+                  transition: 'transform 0.15s ease-out',
                 }}
               >
                 {/* Пульсирующий круг при выборе */}

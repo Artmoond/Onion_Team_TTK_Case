@@ -30,3 +30,8 @@ data/postgres_data/
 
 data/uploads/
 backend/data/
+
+*.db
+*.sqlite3
+generate_presentation.py
+qr_codes/

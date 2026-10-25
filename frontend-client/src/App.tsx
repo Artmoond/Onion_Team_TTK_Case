@@ -328,15 +328,34 @@ export default function App() {
           selectedCategory={selectedCategory}
         />
 
-        {/* Вертикальная менюшка категорий слева (сворачивается при зуме в помещение или маршруте) */}
+        {/* Мобильная горизонтальная полоса категорий (чипы, свайп пальцем, не перекрывает карту) */}
         <div
-          className={`absolute left-3 top-4 z-20 transition-all duration-300 ease-in-out ${
+          className={`md:hidden absolute top-2 left-2 right-2 z-20 transition-all duration-300 ease-in-out ${
+            activeZoneId || activeRoute
+              ? '-translate-y-16 opacity-0 pointer-events-none'
+              : 'translate-y-0 opacity-100'
+          }`}
+        >
+          <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800/90 p-1 shadow-xl">
+            <CategoryFilters
+              layout="horizontal"
+              selectedCategory={selectedCategory}
+              onSelectCategory={cat => setSelectedCategory(cat)}
+              categoryCounts={categoryCounts}
+            />
+          </div>
+        </div>
+
+        {/* Десктопная вертикальная панель категорий слева (только для экранов от md и шире) */}
+        <div
+          className={`hidden md:block absolute left-3 top-4 z-20 transition-all duration-300 ease-in-out ${
             activeZoneId || activeRoute
               ? '-translate-x-56 opacity-0 pointer-events-none'
               : 'translate-x-0 opacity-100'
           }`}
         >
           <CategoryFilters
+            layout="vertical"
             selectedCategory={selectedCategory}
             onSelectCategory={cat => setSelectedCategory(cat)}
             categoryCounts={categoryCounts}

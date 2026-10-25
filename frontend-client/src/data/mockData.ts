@@ -69,6 +69,7 @@ export const mockVenue: Venue = {
         {
           id: 'poi-wc-1',
           floorId: 'floor-1',
+          panoramaId: 'pano-entrance',
           name: 'Санузлы (1 этаж)',
           category: 'wc',
           description: 'Мужской, женский и специально оборудованный санузел для маломобильных групп граждан (МГН).',
@@ -80,6 +81,7 @@ export const mockVenue: Venue = {
         {
           id: 'poi-wifi-1',
           floorId: 'floor-1',
+          panoramaId: 'pano-ttk',
           name: 'Зона High-Speed Wi-Fi 6 ТТК',
           category: 'wifi',
           description: 'Зона усиленного радиопокрытия гигабитным беспроводным интернетом от магистрального провайдера ТТК.',
@@ -91,6 +93,7 @@ export const mockVenue: Venue = {
         {
           id: 'poi-stairs-1',
           floorId: 'floor-1',
+          panoramaId: 'pano-entrance',
           name: 'Лестница на 2 этаж',
           category: 'service',
           description: 'Широкая парадная лестница с выходом к переговорным залам и VIP-лаунджу второго яруса.',
@@ -276,6 +279,7 @@ export const mockVenue: Venue = {
         {
           id: 'poi-stairs-2',
           floorId: 'floor-2',
+          panoramaId: 'pano-vip',
           name: 'Лестничный спуск на 1 этаж',
           category: 'service',
           description: 'Спуск в центральный холл 1 этажа.',
@@ -287,6 +291,7 @@ export const mockVenue: Venue = {
         {
           id: 'poi-vip-lounge',
           floorId: 'floor-2',
+          panoramaId: 'pano-vip',
           name: 'VIP Lounge & Пресс-центр',
           category: 'sponsor',
           description: 'Закрытая зона для стратегических партнеров ТТК, интервью и деловых переговоров.',
@@ -298,6 +303,7 @@ export const mockVenue: Venue = {
         {
           id: 'poi-room-a',
           floorId: 'floor-2',
+          panoramaId: 'pano-room-a',
           name: 'Переговорная «Байкал»',
           category: 'hall',
           description: 'Зал для деловых встреч на 16 персон с ВКС-системой от ТТК.',
@@ -309,6 +315,7 @@ export const mockVenue: Venue = {
         {
           id: 'poi-room-b',
           floorId: 'floor-2',
+          panoramaId: 'pano-room-b',
           name: 'Переговорная «Енисей»',
           category: 'hall',
           description: 'Зал для презентаций продуктов и круглых столов.',
@@ -318,7 +325,80 @@ export const mockVenue: Venue = {
           tags: ['переговорная', 'енисей', 'встречи']
         }
       ],
-      panoramas: [],
+      panoramas: [
+        {
+          id: 'pano-vip',
+          floorId: 'floor-2',
+          title: '360° VIP Lounge ТТК',
+          x: 600,
+          y: 340,
+          url: '/demo-pano-3.webp',
+          previewUrl: '/demo-pano-3.webp',
+          yawOffset: 0,
+          hotspots: [
+            {
+              id: 'h-to-room-a',
+              panoramaId: 'pano-vip',
+              yaw: -45,
+              pitch: 0,
+              type: 'scene',
+              text: 'Переговорная «Байкал»',
+              targetPanoramaId: 'pano-room-a'
+            },
+            {
+              id: 'h-to-room-b',
+              panoramaId: 'pano-vip',
+              yaw: 45,
+              pitch: 0,
+              type: 'scene',
+              text: 'Переговорная «Енисей»',
+              targetPanoramaId: 'pano-room-b'
+            }
+          ]
+        },
+        {
+          id: 'pano-room-a',
+          floorId: 'floor-2',
+          title: '360° Переговорная «Байкал»',
+          x: 230,
+          y: 340,
+          url: '/demo-pano-4.webp',
+          previewUrl: '/demo-pano-4.webp',
+          yawOffset: 0,
+          hotspots: [
+            {
+              id: 'h-back-vip-a',
+              panoramaId: 'pano-room-a',
+              yaw: 180,
+              pitch: 0,
+              type: 'scene',
+              text: 'Вернуться в VIP Lounge',
+              targetPanoramaId: 'pano-vip'
+            }
+          ]
+        },
+        {
+          id: 'pano-room-b',
+          floorId: 'floor-2',
+          title: '360° Переговорная «Енисей»',
+          x: 970,
+          y: 340,
+          url: '/demo-pano.webp',
+          previewUrl: '/demo-pano.webp',
+          yawOffset: 0,
+          hotspots: [
+            {
+              id: 'h-back-vip-b',
+              panoramaId: 'pano-room-b',
+              yaw: 180,
+              pitch: 0,
+              type: 'scene',
+              text: 'Вернуться в VIP Lounge',
+              targetPanoramaId: 'pano-vip'
+            }
+          ]
+        }
+      ],
       graph: {
         nodes: [
           { id: 'n2-stairs', floorId: 'floor-2', x: 390, y: 665, kind: 'stairs' },
