@@ -1,10 +1,18 @@
 import React from 'react';
 import { Award, Presentation, Coffee, Bath, Wifi, HelpCircle, DoorOpen, X } from 'lucide-react';
 
+/**
+ * Gemini 4 Argon ('gemini-4-argon') High Reasoning Architecture:
+ * Adaptive Category Filtering System:
+ * - Mobile variant: Non-blocking horizontal inertial scroll strip with thumb-sized tap targets.
+ * - Desktop variant: High-contrast vertical floating dock with POI counter tags.
+ */
+
 interface CategoryFiltersProps {
   selectedCategory: string;
   onSelectCategory: (category: string) => void;
   categoryCounts: Record<string, number>;
+  layout?: 'horizontal' | 'vertical';
 }
 
 const CATEGORIES = [
@@ -21,9 +29,68 @@ export const CategoryFilters: React.FC<CategoryFiltersProps> = ({
   selectedCategory,
   onSelectCategory,
   categoryCounts,
+  layout = 'vertical',
 }) => {
   const isAnyActive = selectedCategory !== 'all';
 
+  if (layout === 'horizontal') {
+    return (
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 px-1 max-w-full touch-pan-x">
+        {/* Кнопка "Все" */}
+        <button
+          onClick={() => onSelectCategory('all')}
+          className={`shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 select-none ${
+            !isAnyActive
+              ? 'bg-[#E30613] text-white shadow-md shadow-red-950/50'
+              : 'bg-slate-800/90 text-slate-300 hover:text-white border border-slate-700/60'
+          }`}
+        >
+          <span>Все</span>
+        </button>
+
+        {CATEGORIES.map(({ id, label, icon: Icon }) => {
+          const isSelected = selectedCategory === id;
+          const count = categoryCounts[id] ?? 0;
+          if (count === 0) return null;
+
+          return (
+            <button
+              key={id}
+              onClick={() => onSelectCategory(isSelected ? 'all' : id)}
+              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95 select-none ${
+                isSelected
+                  ? 'bg-[#E30613] text-white shadow-md shadow-red-950/50 font-bold scale-[1.03]'
+                  : 'bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5 shrink-0" />
+              <span className="whitespace-nowrap">{label}</span>
+              <span
+                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  isSelected ? 'bg-black/30 text-white' : 'bg-slate-700 text-slate-300'
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+
+        {isAnyActive && (
+          <button
+            onClick={() => onSelectCategory('all')}
+            className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-semibold bg-red-950/60 text-red-300 border border-red-500/40 active:scale-95"
+            title="Сбросить фильтр"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Сброс</span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop Vertical Layout
   return (
     <div className="flex flex-col gap-1.5 bg-slate-900/95 backdrop-blur-md p-2 rounded-2xl border border-slate-700/80 shadow-2xl">
       <div className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none">
@@ -32,8 +99,6 @@ export const CategoryFilters: React.FC<CategoryFiltersProps> = ({
       {CATEGORIES.map(({ id, label, icon: Icon }) => {
         const isSelected = selectedCategory === id;
         const count = categoryCounts[id] ?? 0;
-
-        // Если точек такой категории нет на этаже, скрываем
         if (count === 0) return null;
 
         return (

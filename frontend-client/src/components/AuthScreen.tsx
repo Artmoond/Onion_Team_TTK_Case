@@ -117,6 +117,25 @@ export default function AuthScreen({ mode, alternateUrl, onAuthenticated }: Auth
     }
   };
 
+  const quickDemoLogin = async () => {
+    setEmail(demo.email);
+    setPassword(demo.password);
+    setFormMode('login');
+    setError(null);
+    setBusy(true);
+    try {
+      const session = await loginUser(demo.email, demo.password, mode);
+      onAuthenticated(session);
+    } catch (requestError) {
+      setError(
+        requestError instanceof ApiError
+          ? requestError.message
+          : 'Не удалось выполнить вход.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   const fillDemo = () => {
     setEmail(demo.email);
     setPassword(demo.password);
@@ -408,7 +427,7 @@ export default function AuthScreen({ mode, alternateUrl, onAuthenticated }: Auth
               <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950/50 p-3">
                 <button
                   type="button"
-                  onClick={fillDemo}
+                  onClick={quickDemoLogin}
                   className="flex w-full items-center justify-between gap-2 text-left"
                 >
                   <span>
@@ -420,7 +439,7 @@ export default function AuthScreen({ mode, alternateUrl, onAuthenticated }: Auth
                     </span>
                   </span>
                   <span className="shrink-0 rounded-lg bg-slate-800 px-2.5 py-1.5 text-[10px] font-bold text-cyan-300">
-                    Подставить
+                    Войти сразу →
                   </span>
                 </button>
               </div>
