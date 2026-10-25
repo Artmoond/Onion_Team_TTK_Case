@@ -4,6 +4,7 @@ import {
   FilePlus2,
   FolderOpen,
   Layers,
+  Map as MapIcon,
   QrCode,
   Redo2,
   Save,
@@ -11,11 +12,13 @@ import {
   ShieldCheck,
   LogOut,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { checkBackend } from '../../services/api';
+import { useEffect, useState, useMemo } from 'react';
+import { checkBackend, listVenues } from '../../services/api';
+import { normalizeVenue } from '../../services/serialization';
 import { persistCurrentDraft, useEditorStore } from '../../store/editorStore';
 import { useActiveFloor } from '../../store/editorStore';
 import type { Session } from '../../lib/auth';
+import type { Venue } from '../../types/venue';
 
 interface TopBarProps {
   onOpenBackend: () => void;
@@ -27,6 +30,7 @@ interface TopBarProps {
 
 export function TopBar({ onOpenBackend, onOpenPublish, onNewProject, session, onLogout }: TopBarProps) {
   const venue = useEditorStore((state) => state.venue);
+  const loadProject = useEditorStore((state) => state.loadProject);
   const activeFloor = useActiveFloor();
   const dirty = useEditorStore((state) => state.dirty);
   const saveStatus = useEditorStore((state) => state.saveStatus);
@@ -39,6 +43,7 @@ export function TopBar({ onOpenBackend, onOpenPublish, onNewProject, session, on
   const markSavedLocal = useEditorStore((state) => state.markSavedLocal);
   const showToast = useEditorStore((state) => state.showToast);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+  const [availableVenues, setAvailableVenues] = useState<Venue[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -49,10 +54,30 @@ export function TopBar({ onOpenBackend, onOpenPublish, onNewProject, session, on
       .catch(() => {
         if (!cancelled) setBackendOnline(false);
       });
+
+    listVenues()
+      .then((venues) => {
+        if (!cancelled) {
+          setAvailableVenues(venues.map((v) => normalizeVenue(v)));
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
+
     return () => {
       cancelled = true;
     };
   }, []);
+
+  const allVenues = useMemo(() => {
+    const map = new Map<string, Venue>();
+    if (venue) map.set(venue.slug, venue);
+    for (const v of availableVenues) {
+      map.set(v.slug, v);
+    }
+    return Array.from(map.values());
+  }, [venue, availableVenues]);
 
   if (!venue) return null;
 
@@ -88,15 +113,52 @@ export function TopBar({ onOpenBackend, onOpenPublish, onNewProject, session, on
 
       <div className="mx-2 h-8 w-px bg-slate-800" />
 
-      <div className="flex items-center gap-2">
-        <Layers className="h-4 w-4 text-slate-500" />
+      {/* Селектор выбора карты */}
+      <div className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1 shadow-sm">
+        <MapIcon className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
         <select
-          className="field w-52 py-1"
+          className="max-w-[180px] truncate bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer pr-1"
+          value={venue.slug}
+          onChange={(event) => {
+            const targetSlug = event.target.value;
+            if (targetSlug === '__new__') {
+              onNewProject();
+              return;
+            }
+            if (targetSlug !== venue.slug) {
+              const target = allVenues.find((v) => v.slug === targetSlug);
+              if (target) {
+                loadProject(target);
+                showToast('info', 'Карта переключена', `Открыта площадка «${target.title}»`);
+              }
+            }
+          }}
+          title="Выбрать карту"
+        >
+          <optgroup label="Опубликованные карты">
+            {allVenues.map((v) => (
+              <option key={v.slug} value={v.slug} className="bg-slate-900 text-white">
+                {v.title} (/m/{v.slug})
+              </option>
+            ))}
+          </optgroup>
+          <option value="__new__" className="bg-slate-900 text-cyan-300 font-bold">
+            + Создать новую карту…
+          </option>
+        </select>
+      </div>
+
+      {/* Селектор выбора этажа */}
+      <div className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1 shadow-sm">
+        <Layers className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+        <select
+          className="max-w-[160px] truncate bg-transparent text-xs font-medium text-white focus:outline-none cursor-pointer pr-1"
           value={activeFloor?.id ?? ''}
           onChange={(event) => setActiveFloor(event.target.value)}
+          title="Выбрать этаж"
         >
           {venue.floors.map((floor) => (
-            <option key={floor.id} value={floor.id}>
+            <option key={floor.id} value={floor.id} className="bg-slate-900 text-white">
               {floor.name}
             </option>
           ))}

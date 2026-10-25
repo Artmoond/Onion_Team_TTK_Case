@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Search, Layers, X, Sparkles, UserRound, LogOut } from 'lucide-react';
+import { Search, Layers, X, Sparkles, UserRound, LogOut, QrCode } from 'lucide-react';
 import { Floor, POI } from '../types';
 import type { Session } from '../lib/auth';
 
@@ -16,6 +16,7 @@ interface HeaderProps {
   onSelectSearchResult?: (poi: POI) => void;
   session?: Session | null;
   onLogout?: () => Promise<void>;
+  onOpenQrScanner?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,6 +30,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectSearchResult,
   session,
   onLogout,
+  onOpenQrScanner,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -106,35 +108,49 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Поисковая строка с live-дропдауном */}
+      {/* Поисковая строка с live-дропдауном и кнопкой сканирования QR-кода */}
       <div className="px-3 pb-2.5 pt-0.5 relative" id="header-search-wrapper">
-        <div className="relative flex items-center">
-          <Search className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={searchQuery}
-            onChange={e => onSearchChange(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter' && searchResults.length > 0 && onSelectSearchResult) {
-                onSelectSearchResult(searchResults[0]);
-                onSearchChange('');
-                inputRef.current?.blur();
-              }
-              if (e.key === 'Escape') {
-                onSearchChange('');
-                inputRef.current?.blur();
-              }
-            }}
-            placeholder="Поиск стендов, залов, кофе, WC..."
-            className="w-full bg-slate-800/90 text-sm text-white placeholder-slate-400 pl-9 pr-9 py-2 rounded-xl border border-slate-700/60 focus:outline-none focus:border-[#E30613] focus:ring-1 focus:ring-[#E30613] transition-all"
-          />
-          {searchQuery && (
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1 flex items-center">
+            <Search className="absolute left-3 w-4 h-4 text-slate-400 pointer-events-none" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={searchQuery}
+              onChange={e => onSearchChange(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && searchResults.length > 0 && onSelectSearchResult) {
+                  onSelectSearchResult(searchResults[0]);
+                  onSearchChange('');
+                  inputRef.current?.blur();
+                }
+                if (e.key === 'Escape') {
+                  onSearchChange('');
+                  inputRef.current?.blur();
+                }
+              }}
+              placeholder="Поиск стендов, залов, кофе, WC..."
+              className="w-full bg-slate-800/90 text-sm text-white placeholder-slate-400 pl-9 pr-9 py-2 rounded-xl border border-slate-700/60 focus:outline-none focus:border-[#E30613] focus:ring-1 focus:ring-[#E30613] transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => onSearchChange('')}
+                className="absolute right-2.5 text-slate-400 hover:text-white p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {onOpenQrScanner && (
             <button
-              onClick={() => onSearchChange('')}
-              className="absolute right-2.5 text-slate-400 hover:text-white p-1"
+              onClick={onOpenQrScanner}
+              type="button"
+              className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-red-600 to-[#E30613] hover:from-red-500 hover:to-red-600 active:scale-95 text-white text-xs font-bold rounded-xl shadow-md shadow-red-950/40 border border-red-500/40 transition-all shrink-0 cursor-pointer"
+              title="Отсканировать QR-код карты"
             >
-              <X className="w-4 h-4" />
+              <QrCode className="w-4 h-4" />
+              <span className="hidden sm:inline">QR-код</span>
             </button>
           )}
         </div>

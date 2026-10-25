@@ -1,4 +1,4 @@
-﻿$OutputEncoding = [System.Text.Encoding]::UTF8
+$OutputEncoding = [System.Text.Encoding]::UTF8
 
 Write-Host "🛑 Остановка продакшен-сервисов ТТК..." -ForegroundColor Yellow
 
@@ -33,4 +33,13 @@ if ($hasNativeDocker) {
     wsl @distroArg bash -c "cd '$wslPath' && docker compose -f docker-compose.prod.yml down --remove-orphans"
 }
 
-Write-Host "✅ Продакшен-контейнеры остановлены." -ForegroundColor Green
+# Остановка Cloudflare туннеля (если был запущен)
+Write-Host "-> Остановка Cloudflare туннеля..." -ForegroundColor Gray
+try {
+    Stop-Process -Name "cloudflared" -Force -ErrorAction SilentlyContinue
+} catch {}
+try {
+    wsl @distroArg bash -c "pkill -f cloudflared 2>/dev/null || true" 2>$null
+} catch {}
+
+Write-Host "✅ Все продакшен-сервисы и туннели полностью остановлены." -ForegroundColor Green

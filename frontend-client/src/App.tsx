@@ -9,6 +9,9 @@ import { PoiSheet } from './components/PoiSheet';
 import { RouteDrawer } from './components/RouteDrawer';
 import { PanoModal } from './components/PanoModal';
 import { VirtualWalkModal } from './components/VirtualWalkModal';
+import { QrScannerModal } from './components/QrScannerModal';
+import { ParsedQrResult } from './utils/qrParser';
+import { QrCode } from 'lucide-react';
 import AuthScreen from './components/AuthScreen';
 import { API_URL, clearSession, logoutSession, restoreSession, type Session } from './lib/auth';
 
@@ -43,10 +46,75 @@ export default function App() {
   const [activePanoId, setActivePanoId] = useState<string | null>(null);
   const [showPanoModal, setShowPanoModal] = useState<boolean>(false);
   const [showVirtualWalk, setShowVirtualWalk] = useState<boolean>(false);
+  const [showQrScanner, setShowQrScanner] = useState<boolean>(false);
 
   const [isBackendConnected, setIsBackendConnected] = useState<boolean>(false);
   const [isVenueLoading, setIsVenueLoading] = useState<boolean>(Boolean(publicSlug));
   const [publicLoadError, setPublicLoadError] = useState<string | null>(null);
+
+  // Универсальная загрузка и переключение площадки
+  const fetchAndApplyVenue = async (
+    slug: string,
+    targetPoiId?: string,
+    targetFloorId?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const venueRes = await fetch(`${API_URL}/api/public/${encodeURIComponent(slug)}`);
+      if (!venueRes.ok) {
+        if (venueRes.status === 404) {
+          return { success: false, error: `Карта «${slug}» не найдена на сервере.` };
+        }
+        return { success: false, error: `Ошибка сервера при загрузке карты (${venueRes.status}).` };
+      }
+      const data: Venue = await venueRes.json();
+      if (!data?.floors?.length) {
+        return { success: false, error: 'Сервер вернул карту без этажей.' };
+      }
+
+      setVenue(data);
+
+      let chosenFloorId = targetFloorId || data.floors[0].id;
+      let chosenPoi: POI | null = null;
+
+      if (targetPoiId) {
+        for (const fl of data.floors) {
+          const found = fl.points.find(p => p.id === targetPoiId);
+          if (found) {
+            chosenFloorId = fl.id;
+            chosenPoi = found;
+            break;
+          }
+        }
+      }
+
+      setActiveFloorId(chosenFloorId);
+      setSelectedPoi(chosenPoi);
+      setActiveRoute(null);
+      setActiveZoneId(null);
+      setPublicLoadError(null);
+
+      // Обновляем URL браузера без перезагрузки
+      const newPath = `/m/${encodeURIComponent(slug)}${targetPoiId ? `?poi=${encodeURIComponent(targetPoiId)}` : ''}`;
+      try {
+        window.history.pushState({ slug, poiId: targetPoiId }, '', newPath);
+      } catch {
+        // ignore
+      }
+
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Не удалось связаться с сервером.',
+      };
+    }
+  };
+
+  const handleSelectMapFromQr = async (
+    target: ParsedQrResult
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await fetchAndApplyVenue(target.slug, target.poiId, target.floorId);
+  };
 
   useEffect(() => {
     let active = true;
@@ -78,23 +146,30 @@ export default function App() {
     return venue.floors.find(f => f.id === activeFloorId) || venue.floors[0];
   }, [venue, activeFloorId]);
 
+  // Слушатель перехода по истории браузера (кнопки Вперёд / Назад)
+  useEffect(() => {
+    const handlePopState = () => {
+      const slug = getPublicSlug();
+      if (slug && slug !== venue.slug) {
+        void fetchAndApplyVenue(slug);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [venue.slug]);
+
   // Проверка связи с бэкендом при старте
   useEffect(() => {
     const checkBackend = async () => {
       if (publicSlug) {
-        try {
-          const venueRes = await fetch(`${API_URL}/api/public/${encodeURIComponent(publicSlug)}`);
-          if (!venueRes.ok) throw new Error(venueRes.status === 404 ? 'Карта по этой ссылке не найдена.' : `Ошибка загрузки карты (${venueRes.status}).`);
-          const data: Venue = await venueRes.json();
-          if (!data?.floors?.length) throw new Error('Backend вернул карту без этажей.');
-          setVenue(data);
-          setActiveFloorId(data.floors[0].id);
+        setIsVenueLoading(true);
+        const res = await fetchAndApplyVenue(publicSlug);
+        if (!res.success) {
+          setPublicLoadError(res.error || 'Не удалось загрузить карту.');
+        } else {
           setIsBackendConnected(true);
-        } catch (error) {
-          setPublicLoadError(error instanceof Error ? error.message : 'Не удалось загрузить карту.');
-        } finally {
-          setIsVenueLoading(false);
         }
+        setIsVenueLoading(false);
         return;
       }
       try {
@@ -309,6 +384,7 @@ export default function App() {
         }}
         session={session}
         onLogout={handleLogout}
+        onOpenQrScanner={() => setShowQrScanner(true)}
       />
 
       {/* 2. Область карты с плавающим вертикальным меню фильтров слева */}
@@ -326,6 +402,7 @@ export default function App() {
           activeZoneId={activeZoneId}
           onZoneChange={setActiveZoneId}
           selectedCategory={selectedCategory}
+          venueSlug={venue.slug}
         />
 
         {/* Мобильная горизонтальная полоса категорий (чипы, свайп пальцем, не перекрывает карту) */}
@@ -406,6 +483,25 @@ export default function App() {
           onClose={() => setShowVirtualWalk(false)}
         />
       )}
+
+      {/* 8. Плавающая мобильная кнопка быстрого сканирования QR-кода */}
+      {!selectedPoi && !activeRoute && (
+        <button
+          onClick={() => setShowQrScanner(true)}
+          className="md:hidden fixed bottom-5 right-4 z-30 flex items-center gap-2 px-3.5 py-2.5 bg-gradient-to-r from-red-600 to-[#E30613] hover:from-red-500 hover:to-red-600 active:scale-95 text-white text-xs font-bold rounded-2xl shadow-xl shadow-red-950/70 border border-red-500/40 transition-all cursor-pointer backdrop-blur-md"
+          title="Отсканировать QR-код карты"
+        >
+          <QrCode className="w-4 h-4" />
+          <span>Сканировать QR</span>
+        </button>
+      )}
+
+      {/* 9. Модальное окно сканирования QR-кода камеры / фото / ручной ввод */}
+      <QrScannerModal
+        isOpen={showQrScanner}
+        onClose={() => setShowQrScanner(false)}
+        onSelectMap={handleSelectMapFromQr}
+      />
     </div>
   );
 }

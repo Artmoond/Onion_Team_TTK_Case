@@ -68,6 +68,46 @@ export interface NavGraph {
   edges: NavEdge[];
 }
 
+export interface Wall {
+  id: string;
+  floorId: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  lengthMeters: number;
+  thickness?: number;
+  kind?: 'wall' | 'partition' | 'boundary';
+}
+
+export interface RoomPoint {
+  x: number;
+  y: number;
+}
+
+export interface Room {
+  id: string;
+  floorId: string;
+  name: string;
+  points: RoomPoint[];
+  color?: string;
+  description?: string;
+}
+
+export interface Stair {
+  id: string;
+  floorId: string;
+  name: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  width: number;
+  direction?: 'up' | 'down' | 'both';
+  targetFloorId?: string;
+  targetStairId?: string;
+}
+
 export interface Floor {
   id: string;
   venueId: string;
@@ -80,6 +120,9 @@ export interface Floor {
   points: POI[];
   panoramas: Panorama[];
   graph: NavGraph;
+  walls?: Wall[];
+  rooms?: Room[];
+  stairs?: Stair[];
 }
 
 export interface Venue {

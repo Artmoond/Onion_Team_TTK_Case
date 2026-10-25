@@ -45,10 +45,10 @@ if (-not $hasNativeDocker) {
 if ($hasNativeDocker) {
     Write-Host "-> Launching via Docker Engine..." -ForegroundColor Gray
     docker compose -f docker-compose.prod.yml down --remove-orphans 2>$null
-    docker compose -f docker-compose.prod.yml up -d --remove-orphans
+    docker compose -f docker-compose.prod.yml up -d --build --remove-orphans
 } else {
     Write-Host "-> Launching via WSL..." -ForegroundColor Yellow
-    wsl @distroArg bash -c "cd '$wslPath' && docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null; docker compose -f docker-compose.prod.yml up -d --remove-orphans"
+    wsl @distroArg bash -c "cd '$wslPath' && docker compose -f docker-compose.prod.yml down --remove-orphans 2>/dev/null; docker compose -f docker-compose.prod.yml up -d --build --remove-orphans"
 }
 
 # 4. Check readiness
@@ -62,7 +62,12 @@ for ($i = 0; $i -lt 30; $i++) {
         try {
             $resp2 = Invoke-RestMethod -Uri "http://localhost:8000/api/health" -TimeoutSec 2
             if ($resp2.status -eq "ok") { $ready = $true; break }
-        } catch {}
+        } catch {
+            if (-not $hasNativeDocker) {
+                $wslHealth = (wsl @distroArg curl -s http://127.0.0.1/api/health 2>$null) | Out-String
+                if ($wslHealth -match '"status":\s*"ok"') { $ready = $true; break }
+            }
+        }
     }
     Start-Sleep -Seconds 2
 }
@@ -72,16 +77,40 @@ if ($ready) {
     Write-Host "============================================================" -ForegroundColor Green
     Write-Host "PRODUCTION DEPLOY COMPLETED SUCCESSFULLY!" -ForegroundColor Green
     Write-Host "============================================================" -ForegroundColor Green
-    Write-Host "Gateway URL:              http://localhost" -ForegroundColor Cyan
-    Write-Host "  Client (Visitor):       http://localhost/" -ForegroundColor Gray
-    Write-Host "  Studio (Admin CAD):     http://localhost/admin/" -ForegroundColor Gray
-    Write-Host "  Backend API:            http://localhost/api/" -ForegroundColor Gray
-    Write-Host "  Swagger Docs:           http://localhost/docs" -ForegroundColor Gray
-    Write-Host ""
-    Write-Host "Direct Ports:" -ForegroundColor Cyan
-    Write-Host "  Client:                 http://localhost:3000" -ForegroundColor Gray
-    Write-Host "  Studio:                 http://localhost:3001" -ForegroundColor Gray
-    Write-Host "  Backend:                http://localhost:8000" -ForegroundColor Gray
+    Write-Host "Local Gateway (WSL):" -ForegroundColor Cyan
+    $wslIp = (wsl @distroArg bash -c "ip -4 addr show eth0 | grep -oP '(?<=inet\s)\d+(\.\d+){3}'" 2>$null).Trim()
+    if ($wslIp) {
+        Write-Host "  Client (Visitor):       http://$wslIp/" -ForegroundColor Gray
+        Write-Host "  Studio (Admin CAD):     http://$wslIp/admin/" -ForegroundColor Gray
+        Write-Host "  Backend API:            http://$wslIp/api/" -ForegroundColor Gray
+        Write-Host "  Swagger Docs:           http://$wslIp/docs" -ForegroundColor Gray
+    } else {
+        Write-Host "  Client (Visitor):       http://localhost/" -ForegroundColor Gray
+        Write-Host "  Studio (Admin CAD):     http://localhost/admin/" -ForegroundColor Gray
+    }
+
+    # Автозапуск Cloudflare Tunnel для доступа с телефона без настроек сети
+    $cfBin = "/mnt/$drive$rest/tools/cloudflared-linux"
+    $cfLog = "$PSScriptRoot\tools\cloudflared.log"
+    if (Test-Path "$PSScriptRoot\tools\cloudflared-linux") {
+        Write-Host ""
+        Write-Host "-> Запуск Cloudflare туннеля для доступа со смартфона..." -ForegroundColor Gray
+        wsl @distroArg bash -c "pkill -f cloudflared 2>/dev/null || true" 2>$null
+        wsl @distroArg bash -c "nohup $cfBin tunnel --url http://127.0.0.1:80 --no-autoupdate > '$wslPath/tools/cloudflared.log' 2>&1 &"
+        Start-Sleep -Seconds 4
+        if (Test-Path $cfLog) {
+            $cfContent = Get-Content $cfLog -Raw
+            if ($cfContent -match "(https://[a-zA-Z0-9-]+\.trycloudflare\.com)") {
+                $publicUrl = $matches[1]
+                Write-Host ""
+                Write-Host "🌐 ПУБЛИЧНЫЙ ДОСТУП (ДЛЯ СМАРТФОНА И ПК):" -ForegroundColor Magenta
+                Write-Host "  📱 Мобильный клиент:    $publicUrl/" -ForegroundColor Cyan
+                Write-Host "  🗺 Карта test:          $publicUrl/m/test" -ForegroundColor Cyan
+                Write-Host "  🛠 Студия организатора: $publicUrl/admin/" -ForegroundColor Cyan
+            }
+        }
+    }
+
     Write-Host ""
     Write-Host "Demo Credentials:" -ForegroundColor Cyan
     Write-Host "  User:  user@ttk.example.com  / User12345!" -ForegroundColor Gray

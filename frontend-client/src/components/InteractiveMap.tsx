@@ -26,6 +26,7 @@ interface InteractiveMapProps {
   activeZoneId: string | null;
   onZoneChange: (zoneId: string | null) => void;
   selectedCategory?: string;
+  venueSlug?: string;
 }
 
 interface MapZone {
@@ -60,8 +61,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   activeZoneId,
   onZoneChange,
   selectedCategory = 'all',
+  venueSlug = '',
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Определяем, является ли площадка демо-стендом ТТК Экспо или пользовательской картой из редактора
+  const isDemoTtkVenue = (venueSlug === 'ttk-expo' || !venueSlug) && (!floor.walls || floor.walls.length === 0);
 
   // Базовый масштаб по умолчанию: 1.0 (ровно 100%, весь план полностью виден)
   const BASE_SCALE = 1.0;
@@ -83,6 +88,39 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Конфигурация кликабельных зон/прямоугольников
   const zones: MapZone[] = useMemo(() => {
+    if (!isDemoTtkVenue) {
+      if (floor.rooms && floor.rooms.length > 0) {
+        return floor.rooms.map((room) => {
+          const xs = room.points.map((p) => p.x);
+          const ys = room.points.map((p) => p.y);
+          const minX = Math.min(...xs);
+          const maxX = Math.max(...xs);
+          const minY = Math.min(...ys);
+          const maxY = Math.max(...ys);
+          const centerX = (minX + maxX) / 2;
+          const centerY = (minY + maxY) / 2;
+          return {
+            id: room.id,
+            name: room.name,
+            category: 'hall',
+            floorLevel: floor.level,
+            shape: 'rect',
+            x: minX,
+            y: minY,
+            width: maxX - minX,
+            height: maxY - minY,
+            centerX,
+            centerY,
+            zoomScale: 1.8,
+            poiIds: pois.filter((p) => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY).map((p) => p.id),
+            panoIds: floor.panoramas.filter((p) => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY).map((p) => p.id),
+            color: room.color || '#6366f1',
+          };
+        });
+      }
+      return [];
+    }
+
     if (floor.level === 1) {
       return [
         {
@@ -465,6 +503,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Значки эмблем POI появляются внутри выбранного зала ИЛИ при активной категории фильтра
   const visiblePois = useMemo(() => {
     if (activeRoute) return pois;
+    if (!isDemoTtkVenue) {
+      if (selectedCategory && selectedCategory !== 'all') {
+        return pois.filter(p => p.category === selectedCategory);
+      }
+      return pois;
+    }
     if (currentActiveZone) {
       return pois.filter(p => currentActiveZone.poiIds.includes(p.id));
     }
@@ -473,11 +517,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       return pois.filter(p => p.category === selectedCategory);
     }
     return [];
-  }, [currentActiveZone, pois, activeRoute, selectedCategory]);
+  }, [isDemoTtkVenue, currentActiveZone, pois, activeRoute, selectedCategory]);
 
   // Значки эмблем 360° панорам: всегда отображаются на плане для мгновенного перехода в 360°
   const visiblePanos = useMemo(() => {
-    return floor.panoramas;
+    return floor.panoramas || [];
   }, [floor.panoramas]);
 
   const routePoints = activeRoute?.legs?.[0]?.points || [];
@@ -572,7 +616,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         }}
       >
         <svg
-          viewBox="0 0 1200 800"
+          viewBox={`0 0 ${floor.width || 1200} ${floor.height || 800}`}
           className="w-full h-full max-w-[1200px] max-h-[800px] object-contain drop-shadow-2xl"
         >
           <defs>
@@ -604,8 +648,202 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </pattern>
           </defs>
 
+          {/* ================= ДИНАМИЧЕСКИЙ СЛОЙ ДЛЯ ПОЛЬЗОВАТЕЛЬСКИХ КАРТ ИЗ РЕДАКТОРА ================= */}
+          {!isDemoTtkVenue && (() => {
+            const width = floor.width || 1200;
+            const height = floor.height || 800;
+            const hasContent = (floor.walls && floor.walls.length > 0) ||
+                               (floor.rooms && floor.rooms.length > 0) ||
+                               (floor.stairs && floor.stairs.length > 0) ||
+                               (floor.points && floor.points.length > 0) ||
+                               Boolean(floor.planUrl);
+
+            return (
+              <g id="custom-venue-geometry">
+                {/* Внешний контур и сетка этажа */}
+                <rect
+                  x="20"
+                  y="20"
+                  width={width - 40}
+                  height={height - 40}
+                  rx="18"
+                  fill="#0b1120"
+                  stroke="#1e293b"
+                  strokeWidth="3"
+                />
+                <rect
+                  x="20"
+                  y="20"
+                  width={width - 40}
+                  height={height - 40}
+                  rx="18"
+                  fill="url(#floorTile)"
+                  opacity="0.35"
+                />
+
+                {/* Подложка плана (если загружена картинка в редакторе) */}
+                {floor.planUrl && (
+                  <image
+                    href={floor.planUrl}
+                    x="20"
+                    y="20"
+                    width={width - 40}
+                    height={height - 40}
+                    preserveAspectRatio="xMidYMid meet"
+                    opacity="0.85"
+                  />
+                )}
+
+                {/* Помещения / Зоны (Rooms) */}
+                {floor.rooms?.map((room) => {
+                  if (!room.points || room.points.length === 0) return null;
+                  const isSelected = activeZoneId === room.id;
+                  const isHovered = hoveredZoneId === room.id;
+                  const ptsString = room.points.map(p => `${p.x},${p.y}`).join(' ');
+                  const xs = room.points.map(p => p.x);
+                  const ys = room.points.map(p => p.y);
+                  const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+                  const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+                  const baseColor = room.color || '#3b82f6';
+
+                  return (
+                    <g
+                      key={room.id}
+                      className="cursor-pointer transition-all duration-200"
+                      onClick={() => {
+                        const z = zones.find(z => z.id === room.id);
+                        if (z) handleZoomToZone(z);
+                      }}
+                      onPointerEnter={() => setHoveredZoneId(room.id)}
+                      onPointerLeave={() => setHoveredZoneId(null)}
+                    >
+                      <polygon
+                        points={ptsString}
+                        fill={baseColor}
+                        fillOpacity={isSelected ? 0.35 : isHovered ? 0.25 : 0.15}
+                        stroke={baseColor}
+                        strokeWidth={isSelected ? 3.5 : isHovered ? 2.5 : 1.5}
+                        strokeDasharray={isSelected ? undefined : "6 4"}
+                        filter={isSelected ? 'url(#highlightGlow)' : undefined}
+                      />
+                      {room.name && (
+                        <text
+                          x={centerX}
+                          y={centerY + 5}
+                          textAnchor="middle"
+                          fill={isSelected || isHovered ? '#ffffff' : '#94a3b8'}
+                          fontSize="15"
+                          fontWeight="700"
+                          className="pointer-events-none drop-shadow-md"
+                        >
+                          {room.name}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+
+                {/* Лестницы (Stairs) */}
+                {floor.stairs?.map((stair) => {
+                  const minX = Math.min(stair.x1, stair.x2);
+                  const minY = Math.min(stair.y1, stair.y2);
+                  const sWidth = Math.abs(stair.x2 - stair.x1) || stair.width || 40;
+                  const sHeight = Math.abs(stair.y2 - stair.y1) || stair.width || 60;
+                  const centerX = (stair.x1 + stair.x2) / 2;
+                  const centerY = (stair.y1 + stair.y2) / 2;
+
+                  return (
+                    <g key={stair.id} className="pointer-events-none">
+                      <rect
+                        x={minX}
+                        y={minY}
+                        width={sWidth}
+                        height={sHeight}
+                        rx="8"
+                        fill="#1e293b"
+                        stroke="#f59e0b"
+                        strokeWidth="2"
+                        fillOpacity="0.8"
+                      />
+                      <text
+                        x={centerX}
+                        y={centerY + 4}
+                        textAnchor="middle"
+                        fill="#fbbf24"
+                        fontSize="11"
+                        fontWeight="bold"
+                      >
+                        {stair.name || 'Лестница'}
+                      </text>
+                    </g>
+                  );
+                })}
+
+                {/* Стены (Walls) с неоновым свечением и четким профилем */}
+                {floor.walls?.map((wall) => {
+                  const thickness = wall.thickness ?? 4;
+                  return (
+                    <g key={wall.id} className="pointer-events-none">
+                      {/* Мягкое неоновое свечение стен */}
+                      <line
+                        x1={wall.x1}
+                        y1={wall.y1}
+                        x2={wall.x2}
+                        y2={wall.y2}
+                        stroke="#38bdf8"
+                        strokeWidth={thickness + 6}
+                        strokeOpacity="0.18"
+                        strokeLinecap="round"
+                      />
+                      {/* Основное тело стены */}
+                      <line
+                        x1={wall.x1}
+                        y1={wall.y1}
+                        x2={wall.x2}
+                        y2={wall.y2}
+                        stroke="#475569"
+                        strokeWidth={thickness + 1}
+                        strokeLinecap="round"
+                      />
+                      {/* Яркая контрастная сердцевина */}
+                      <line
+                        x1={wall.x1}
+                        y1={wall.y1}
+                        x2={wall.x2}
+                        y2={wall.y2}
+                        stroke="#94a3b8"
+                        strokeWidth={Math.max(1.5, thickness - 1.5)}
+                        strokeLinecap="round"
+                        strokeOpacity="0.95"
+                      />
+                      {/* Скругленные узловые стыки */}
+                      <circle cx={wall.x1} cy={wall.y1} r={thickness / 2} fill="#94a3b8" />
+                      <circle cx={wall.x2} cy={wall.y2} r={thickness / 2} fill="#94a3b8" />
+                    </g>
+                  );
+                })}
+
+                {/* Плашка при отсутствии разметки */}
+                {!hasContent && (
+                  <g transform={`translate(${width / 2}, ${height / 2})`} className="pointer-events-none">
+                    <rect x="-180" y="-55" width="360" height="110" rx="16" fill="#0f172a" stroke="#334155" strokeWidth="1.5" />
+                    <text x="0" y="-12" textAnchor="middle" fill="#f8fafc" fontSize="16" fontWeight="bold">
+                      {floor.name || 'Этаж площадки'}
+                    </text>
+                    <text x="0" y="16" textAnchor="middle" fill="#94a3b8" fontSize="12">
+                      План этажа пока не размечен
+                    </text>
+                    <text x="0" y="36" textAnchor="middle" fill="#64748b" fontSize="11">
+                      Добавьте стены, зоны и точки в Редакторе ТТК
+                    </text>
+                  </g>
+                )}
+              </g>
+            );
+          })()}
+
           {/* ================= 1 ЭТАЖ ================= */}
-          {floor.level === 1 && (() => {
+          {isDemoTtkVenue && floor.level === 1 && (() => {
             const isAnyCategoryActive = selectedCategory !== 'all';
             const isSiriusMatch = selectedCategory === 'hall';
             const siriusDimmed = isAnyCategoryActive && !isSiriusMatch;
@@ -883,7 +1121,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           })()}
 
           {/* ================= 2 ЭТАЖ ================= */}
-          {floor.level === 2 && (() => {
+          {isDemoTtkVenue && floor.level === 2 && (() => {
             const isAnyCategoryActive = selectedCategory !== 'all';
             const isVipMatch = selectedCategory === 'sponsor';
             const vipDimmed = isAnyCategoryActive && !isVipMatch;

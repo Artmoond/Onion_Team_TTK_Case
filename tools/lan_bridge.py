@@ -49,13 +49,31 @@ def forward_stream(source, destination):
         except Exception:
             pass
 
+def get_target_ip():
+    try:
+        import subprocess
+        out = subprocess.check_output(["wsl", "bash", "-c", "ip -4 addr show eth0 | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'"], timeout=2)
+        ip = out.decode().strip()
+        if ip:
+            return ip
+    except Exception:
+        pass
+    return "127.0.0.1"
+
+TARGET_IP = get_target_ip()
+
 def handle_client(client_socket, target_port):
     try:
         target_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        target_socket.connect(("127.0.0.1", target_port))
+        target_socket.connect((TARGET_IP, target_port))
     except Exception:
-        client_socket.close()
-        return
+        try:
+            # Фолбэк на 127.0.0.1 если WSL недоступен
+            target_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            target_socket.connect(("127.0.0.1", target_port))
+        except Exception:
+            client_socket.close()
+            return
 
     t1 = threading.Thread(target=forward_stream, args=(client_socket, target_socket), daemon=True)
     t2 = threading.Thread(target=forward_stream, args=(target_socket, client_socket), daemon=True)
@@ -97,6 +115,7 @@ def main():
         print(f"  🚀 Бэкенд API:                http://{ip}:8000/docs")
         print("------------------------------------------------------------")
         for port in ports:
+            threading.Thread(target=start_port_forward, args=("127.0.0.1", port), daemon=True).start()
             threading.Thread(target=start_port_forward, args=(ip, port), daemon=True).start()
 
     print("Подключите телефон к ТОМУ ЖЕ Wi-Fi и откройте ссылку выше в мобильном браузере.")

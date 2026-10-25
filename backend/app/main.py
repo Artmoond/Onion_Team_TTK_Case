@@ -116,15 +116,7 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 MOCK_FILE = Path(os.getenv("TTK_MOCK_FILE", "/app/shared/mock_venue.json"))
 local_venues_db: Dict[str, Any] = {}
 
-def load_initial_data():
-    if MOCK_FILE.exists():
-        try:
-            with open(MOCK_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                local_venues_db[data["slug"]] = data
-        except Exception as e:
-            print(f"Error loading initial mock data: {e}")
-
+def sync_venues_from_disk():
     venues_dir = UPLOAD_DIR / "venues"
     if venues_dir.exists():
         for fpath in venues_dir.glob("*.json"):
@@ -135,6 +127,17 @@ def load_initial_data():
                         local_venues_db[v["slug"]] = v
             except Exception as e:
                 print(f"Error loading venue from {fpath}: {e}")
+
+def load_initial_data():
+    if MOCK_FILE.exists():
+        try:
+            with open(MOCK_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                local_venues_db[data["slug"]] = data
+        except Exception as e:
+            print(f"Error loading initial mock data: {e}")
+
+    sync_venues_from_disk()
 
 load_initial_data()
 
@@ -147,11 +150,30 @@ class RouteRequestModel(BaseModel):
 
 @app.get("/api/health")
 def healthcheck():
+    sync_venues_from_disk()
     return {"status": "ok", "service": "ttk-space-map-backend", "venues_count": len(local_venues_db)}
 
 # --- ПУБЛИЧНЫЙ API (ДЛЯ ПОСЕТИТЕЛЕЙ) ---
+@app.get("/api/public/venues/list")
+def list_public_venues():
+    sync_venues_from_disk()
+    return [
+        {
+            "id": v.get("id"),
+            "slug": v.get("slug"),
+            "title": v.get("title", v.get("slug")),
+            "description": v.get("description", ""),
+            "floorsCount": len(v.get("floors", [])),
+            "pointsCount": sum(len(f.get("points", [])) for f in v.get("floors", [])),
+            "publicUrl": v.get("publicUrl", f"{PUBLIC_MAP_BASE_URL}/m/{v.get('slug')}"),
+        }
+        for v in local_venues_db.values()
+    ]
+
 @app.get("/api/public/{slug}")
 def get_public_venue(slug: str):
+    if slug not in local_venues_db:
+        sync_venues_from_disk()
     venue = local_venues_db.get(slug)
     if not venue:
         # Если не найден точный slug, вернем первый доступный для удобства демо
@@ -213,10 +235,12 @@ def list_panoramas():
 # --- API ОРГАНИЗАТОРА (ДЛЯ АДМИНКИ) ---
 @app.get("/api/venues")
 def list_venues(_admin=Depends(require_admin)):
+    sync_venues_from_disk()
     return list(local_venues_db.values())
 
 @app.get("/api/venues/{slug}")
 def get_venue(slug: str, _admin=Depends(require_admin)):
+    sync_venues_from_disk()
     venue = local_venues_db.get(slug)
     if not venue:
         raise HTTPException(status_code=404, detail="Площадка не найдена")

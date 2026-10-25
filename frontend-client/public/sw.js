@@ -1,20 +1,18 @@
-// Service Worker для офлайн-работы PWA (кэширование плана, скриптов и панорам)
-const CACHE_NAME = 'ttk-map-cache-v1';
+// Service Worker для офлайн-работы PWA с гарантией мгновенного обновления версий
+const CACHE_NAME = 'ttk-map-cache-v4';
 
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/demo-pano.webp',
-  '/demo-pano-2.webp',
+  '/icon.svg',
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(STATIC_ASSETS);
-    })
+    caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS))
   );
+  // Немедленно активируем новый Service Worker без ожидания закрытия вкладок
   self.skipWaiting();
 });
 
@@ -24,41 +22,55 @@ self.addEventListener('activate', event => {
       return Promise.all(
         keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
 self.addEventListener('fetch', event => {
-  // Игнорируем запросы к сторонним API и chrome-extension
-  if (!event.request.url.startsWith(self.location.origin)) {
+  const url = new URL(event.request.url);
+
+  // Игнорируем не-GET, сторонние домены и API запросы (API всегда через сеть!)
+  if (
+    event.request.method !== 'GET' ||
+    !event.request.url.startsWith(self.location.origin) ||
+    url.pathname.startsWith('/api/')
+  ) {
     return;
   }
 
+  // 1. Для HTML и навигации: Network-First (всегда свежая версия с сервера, fallback в кэш только при офлайне)
+  if (event.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.startsWith('/m/')) {
+    event.respondWith(
+      fetch(event.request)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // Если сеть недоступна (офлайн) — берем из кэша
+          return caches.match(event.request).then(cached => cached || caches.match('/index.html'));
+        })
+    );
+    return;
+  }
+
+  // 2. Для остальных ресурсов (JS, CSS, картинки): Stale-While-Revalidate
   event.respondWith(
     caches.match(event.request).then(cachedResponse => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then(networkResponse => {
-        // Кэшируем успешные GET-ответы
-        if (
-          networkResponse &&
-          networkResponse.status === 200 &&
-          event.request.method === 'GET'
-        ) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        // Офлайн-фоллбэк для навигации
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-      });
+      const fetchPromise = fetch(event.request)
+        .then(networkResponse => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => cachedResponse);
+
+      return cachedResponse || fetchPromise;
     })
   );
 });
