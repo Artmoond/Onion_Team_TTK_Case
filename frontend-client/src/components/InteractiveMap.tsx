@@ -285,28 +285,33 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     onClearSelectedPoi();
   }, [onZoneChange, onClearSelectedPoi]);
 
-  // Gemini 4 Argon ('gemini-4-argon') High Reasoning: Adaptive Viewport Projection
-  // Точная проекция координат SVG (1200x800) в реальные CSS пиксели экрана смартфона (360-430px)
+  // Адаптивное центрирование зоны:
+  // Пересчитываем координаты центра зоны из SVG-пространства (1200x800) в экранные пиксели.
+  // Корректно работает на экранах любого формата: от смартфонов (360px) до мониторов (Full HD, 4K).
   const handleZoomToZone = (zone: MapZone) => {
     onZoneChange(zone.id);
     const targetScale = zone.zoomScale || 1.8;
 
     const container = containerRef.current;
-    const containerW = container ? container.clientWidth : 390;
-    const containerH = container ? container.clientHeight : 600;
+    const containerW = container ? container.clientWidth : 1200;
+    const containerH = container ? container.clientHeight : 800;
 
-    // Масштаб SVG в режиме object-contain
-    const svgScale = Math.min(containerW / 1200, containerH / 800);
+    // Фактический размер SVG до зума с учетом object-contain и padding
+    const isMobile = containerW < 640;
+    const pad = isMobile ? 24 : 40;
+    const availW = Math.max(100, containerW - pad);
+    const availH = Math.max(100, containerH - pad);
+    const baseSvgW = Math.min(1200, availW, availH * 1.5);
+    const baseSvgH = baseSvgW / 1.5;
+    const pxPerSvgUnit = baseSvgW / 1200;
 
-    // Смещение в пикселях экрана для центрирования зоны ровно по середине вьюпорта
-    const dx = (600 - zone.centerX) * svgScale * targetScale;
-    const dy = (400 - zone.centerY) * svgScale * targetScale;
+    // Смещение для идеального центрирования целевой зоны на экране
+    const dx = (600 - zone.centerX) * pxPerSvgUnit * targetScale;
+    const dy = (400 - zone.centerY) * pxPerSvgUnit * targetScale;
 
-    // Динамические границы с учетом размеров экрана, чтобы план никогда не улетал за пределы
-    const renderedW = 1200 * svgScale * targetScale;
-    const renderedH = 800 * svgScale * targetScale;
-    const maxBoundX = Math.max(0, (renderedW - containerW) / 2 + 15);
-    const maxBoundY = Math.max(0, (renderedH - containerH) / 2 + 15);
+    // Допустимые границы панорамирования: позволяют центрировать любую точку здания
+    const maxBoundX = (baseSvgW * targetScale) * 0.48;
+    const maxBoundY = (baseSvgH * targetScale) * 0.48;
 
     const clampedX = Math.max(-maxBoundX, Math.min(maxBoundX, dx));
     const clampedY = Math.max(-maxBoundY, Math.min(maxBoundY, dy));
@@ -364,14 +369,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     const newY = translateStartRef.current.y + dy;
 
     const container = containerRef.current;
-    const containerW = container ? container.clientWidth : 390;
-    const containerH = container ? container.clientHeight : 600;
-    const svgScale = Math.min(containerW / 1200, containerH / 800);
-    const renderedW = 1200 * svgScale * scale;
-    const renderedH = 800 * svgScale * scale;
+    const containerW = container ? container.clientWidth : 1200;
+    const containerH = container ? container.clientHeight : 800;
 
-    const maxBoundX = Math.max(0, (renderedW - containerW) / 2 + 25);
-    const maxBoundY = Math.max(0, (renderedH - containerH) / 2 + 25);
+    const isMobile = containerW < 640;
+    const pad = isMobile ? 24 : 40;
+    const availW = Math.max(100, containerW - pad);
+    const availH = Math.max(100, containerH - pad);
+    const baseSvgW = Math.min(1200, availW, availH * 1.5);
+    const baseSvgH = baseSvgW / 1.5;
+
+    const maxBoundX = (baseSvgW * scale) * 0.48;
+    const maxBoundY = (baseSvgH * scale) * 0.48;
 
     const clampedX = Math.max(-maxBoundX, Math.min(maxBoundX, newX));
     const clampedY = Math.max(-maxBoundY, Math.min(maxBoundY, newY));
@@ -462,17 +471,20 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   // Активная зона
   const currentActiveZone = zones.find(z => z.id === activeZoneId);
 
-  // Значки эмблем POI появляются внутри выбранного зала ИЛИ при активной категории фильтра
+  // Значки эмблем POI:
+  // - На общем плане видны все ключевые локации здания
+  // - При выборе категории фильтра — подсвечиваются и фильтруются точки этой категории
+  // - При зуме в конкретный зал — отображаются точки этого зала
   const visiblePois = useMemo(() => {
     if (activeRoute) return pois;
     if (currentActiveZone) {
-      return pois.filter(p => currentActiveZone.poiIds.includes(p.id));
+      const zonePois = pois.filter(p => currentActiveZone.poiIds?.includes(p.id));
+      return zonePois.length > 0 ? zonePois : pois;
     }
-    // Если в левой менюшке нажата категория — подсвечиваем и показываем эмблемы этой категории
     if (selectedCategory && selectedCategory !== 'all') {
       return pois.filter(p => p.category === selectedCategory);
     }
-    return [];
+    return pois;
   }, [currentActiveZone, pois, activeRoute, selectedCategory]);
 
   // Значки эмблем 360° панорам: всегда отображаются на плане для мгновенного перехода в 360°
@@ -1075,14 +1087,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </g>
           )}
 
-          {/* ================= ЭМБЛЕМЫ 360° ПАНОРАМ (ПОЯВЛЯЮТСЯ ВНУТРИ ВЫБРАННОЙ ЗОНЫ) ================= */}
+          {/* ================= ЭМБЛЕМЫ 360° ПАНОРАМ ================= */}
           {visiblePanos.map(pano => {
             const isHovered = hoveredItemId === pano.id;
+            const pinScale = isHovered ? 1.3 : 1;
 
             return (
               <g
                 key={pano.id}
-                transform={`translate(${pano.x}, ${pano.y})`}
+                transform={`translate(${pano.x}, ${pano.y}) scale(${pinScale})`}
                 onClick={e => {
                   e.stopPropagation();
                   setHoveredItemId(null);
@@ -1090,12 +1103,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 }}
                 onPointerEnter={() => setHoveredItemId(pano.id)}
                 onPointerLeave={() => setHoveredItemId(null)}
-                className="interactive-pin cursor-pointer transition-all duration-200"
-                style={{
-                  transformOrigin: '0px 0px',
-                  transform: isHovered ? 'scale(1.3)' : 'scale(1)',
-                  transition: 'transform 0.15s ease-out',
-                }}
+                className="interactive-pin cursor-pointer transition-transform duration-150 ease-out"
               >
                 {/* Идеально выровненная эмблема 360 */}
                 <circle
@@ -1137,7 +1145,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             );
           })}
 
-          {/* ================= ЭМБЛЕМЫ POI (ПОЯВЛЯЮТСЯ ВНУТРИ ВЫБРАННОЙ ЗОНЫ) ================= */}
+          {/* ================= ЭМБЛЕМЫ POI ================= */}
           {visiblePois.map(poi => {
             const isSelected = selectedPoi?.id === poi.id;
             const isHovered = hoveredItemId === poi.id;
@@ -1145,11 +1153,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             const showTooltip = isHovered && !selectedPoi;
             const details = getCategoryDetails(poi.category);
             const Icon = details.icon;
+            const pinScale = isSelected || isHovered ? 1.3 : 1;
 
             return (
               <g
                 key={poi.id}
-                transform={`translate(${poi.x}, ${poi.y})`}
+                transform={`translate(${poi.x}, ${poi.y}) scale(${pinScale})`}
                 onClick={e => {
                   e.stopPropagation();
                   setHoveredItemId(null);
@@ -1157,12 +1166,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 }}
                 onPointerEnter={() => setHoveredItemId(poi.id)}
                 onPointerLeave={() => setHoveredItemId(null)}
-                className="interactive-pin cursor-pointer transition-all duration-200"
-                style={{
-                  transformOrigin: '0px 0px',
-                  transform: isSelected || isHovered ? 'scale(1.3)' : 'scale(1)',
-                  transition: 'transform 0.15s ease-out',
-                }}
+                className="interactive-pin cursor-pointer transition-transform duration-150 ease-out"
               >
                 {/* Пульсирующий круг при выборе */}
                 {isSelected && (

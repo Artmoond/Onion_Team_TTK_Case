@@ -15,9 +15,8 @@ import {
 } from 'lucide-react';
 
 /**
- * Gemini 4 Argon ('gemini-4-argon') High Reasoning Architecture:
  * 360° Spherical Panoramic Engine with Cross-Platform Motion Tracking:
- * - Direct DeviceOrientation Event Bus bypassing HTTP/HTTPS restrictions
+ * - Direct DeviceOrientation Event Bus
  * - Relative Angle Integration (alpha/beta delta tracking) for drift-free orientation
  * - High-precision 60 FPS viewport camera positioning via Pannellum WebGL
  */

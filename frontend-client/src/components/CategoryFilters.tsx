@@ -2,10 +2,9 @@ import React from 'react';
 import { Award, Presentation, Coffee, Bath, Wifi, HelpCircle, DoorOpen, X } from 'lucide-react';
 
 /**
- * Gemini 4 Argon ('gemini-4-argon') High Reasoning Architecture:
  * Adaptive Category Filtering System:
- * - Mobile variant: Non-blocking horizontal inertial scroll strip with thumb-sized tap targets.
- * - Desktop variant: High-contrast vertical floating dock with POI counter tags.
+ * - Mobile: Inertial swipeable filter strip with touch-optimized targets.
+ * - Desktop: Vertical floating dock with POI counter tags.
  */
 
 interface CategoryFiltersProps {
