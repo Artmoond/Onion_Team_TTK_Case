@@ -74,7 +74,7 @@ export function TopBar({ onOpenBackend, onOpenPublish, onNewProject, onLogout }:
               : 'Без изменений';
 
   return (
-    <header className="z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900 px-4">
+    <header className="editor-topbar z-20 flex h-16 shrink-0 items-center gap-3 border-b border-slate-800 bg-slate-900 px-4">
       <div className="flex min-w-0 items-center gap-3">
         <span className="rounded bg-brand px-2.5 py-1 text-xs font-black tracking-wider text-white">ТТК</span>
         <div className="min-w-0">
@@ -85,7 +85,7 @@ export function TopBar({ onOpenBackend, onOpenPublish, onNewProject, onLogout }:
 
       <div className="mx-2 h-8 w-px bg-slate-800" />
 
-      <div className="flex items-center gap-2">
+      <div className="editor-floor-select flex items-center gap-2">
         <Layers className="h-4 w-4 text-slate-500" />
         <select
           className="field w-52 py-1"
@@ -100,7 +100,7 @@ export function TopBar({ onOpenBackend, onOpenPublish, onNewProject, onLogout }:
         </select>
       </div>
 
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="editor-actions ml-auto flex items-center gap-1.5">
         <button className="btn px-2" onClick={undo} disabled={!canUndo} title="Отменить (Ctrl+Z)">
           <Undo2 className="h-4 w-4" />
         </button>

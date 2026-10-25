@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
+import { PanelLeft, SlidersHorizontal, X } from 'lucide-react';
 import { AuthScreen } from './components/auth/AuthScreen';
 import { FloorTabs } from './components/floors/FloorTabs';
 import { ConfirmDialog } from './components/layout/ConfirmDialog';
@@ -29,6 +30,7 @@ export default function App() {
   const [publishOpen, setPublishOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [mobilePanel, setMobilePanel] = useState<'tools' | 'properties' | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -110,7 +112,7 @@ export default function App() {
   const totalPanoramas = venue.floors.reduce((sum, floor) => sum + floor.panoramas.length, 0);
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
+    <div className="editor-shell flex h-screen w-screen flex-col overflow-hidden bg-slate-950 text-slate-100">
       <TopBar
         onLogout={() => setLogoutConfirmOpen(true)}
         onOpenBackend={() => setBackendOpen(true)}
@@ -118,15 +120,26 @@ export default function App() {
         onNewProject={() => setNewProjectOpen(true)}
       />
       <FloorTabs />
-      <div className="flex min-h-0 flex-1">
-        <Sidebar />
+      <div className="editor-workspace relative flex min-h-0 flex-1">
+        {mobilePanel && <button className="mobile-drawer-backdrop" aria-label="Закрыть панель" onClick={() => setMobilePanel(null)} />}
+        <div className={`mobile-sidebar-container${mobilePanel === 'tools' ? ' is-open' : ''}`}>
+          {mobilePanel === 'tools' && <div className="mobile-drawer-heading"><span>Инструменты и объекты</span><button onClick={() => setMobilePanel(null)} aria-label="Закрыть"><X className="h-4 w-4" /></button></div>}
+          <Sidebar />
+        </div>
         <main className="relative min-w-0 flex-1">
           <Suspense fallback={<div className="grid h-full place-items-center text-xs text-slate-500">Загрузка редактора…</div>}>
             <EditorCanvas />
           </Suspense>
         </main>
-        <PropertiesPanel />
+        <div className={`mobile-properties-container${mobilePanel === 'properties' ? ' is-open' : ''}`}>
+          {mobilePanel === 'properties' && <div className="mobile-drawer-heading"><span>Свойства</span><button onClick={() => setMobilePanel(null)} aria-label="Закрыть"><X className="h-4 w-4" /></button></div>}
+          <PropertiesPanel />
+        </div>
       </div>
+      <nav className="mobile-editor-nav" aria-label="Панели редактора">
+        <button className={mobilePanel === 'tools' ? 'active' : ''} onClick={() => setMobilePanel(mobilePanel === 'tools' ? null : 'tools')}><PanelLeft className="h-5 w-5" /><span>Инструменты</span></button>
+        <button className={mobilePanel === 'properties' ? 'active' : ''} onClick={() => setMobilePanel(mobilePanel === 'properties' ? null : 'properties')}><SlidersHorizontal className="h-5 w-5" /><span>Свойства</span></button>
+      </nav>
       <footer className="z-20 flex h-7 shrink-0 items-center gap-4 border-t border-slate-800 bg-slate-900 px-3 text-[9px] text-slate-500">
         <span className="font-mono">schema v{venue.schemaVersion ?? 1}</span>
         <span>{activeFloor?.name ?? '—'}</span>
